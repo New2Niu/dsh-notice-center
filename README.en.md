@@ -117,8 +117,8 @@ Finished and pending each have their own dropdown, **47 entries** in total: 2 bu
 
 ### Requirements
 
-- **Official DeepSeek Harness**: `1.4.0` requires **`0.1.7-rc.2+`**; `1.3.x` supports `0.1.2-rc.1+`
-  - The range is declared in `engines.dsh` and the `@deepseek-ai/dsh-*` peers, guarded by `test/compat-range.smoke.mjs`. The two lines split by host version: **the Market never offers 1.4.0 to an older host, and the DSH core refuses to load it** — older hosts simply stay on `1.3.x` with no update prompt.
+- **Official DeepSeek Harness**: the current code requires **`0.2.0-rc.1+`** (`engines.dsh` = `>=0.2.0-rc.1 <0.3.0-0`; only the 0.2.0-rc.1 line has been verified — 0.1.x is no longer supported); the published `1.4.x` on npm requires `0.1.7-rc.2+`, and `1.3.x` supports `0.1.2-rc.1+`
+  - The range is declared in `engines.dsh` and the `@deepseek-ai/dsh-*` peers, guarded by `test/compat-range.smoke.mjs`. Both layers split by host version: **the Market never offers an incompatible version to an older host, and the DSH core refuses to load it** — older hosts simply stay on their old release with no update prompt.
   - The version gate only compares version strings and cannot detect a removed API (0.1.7 dropped `settings.register` while the old declaration still passed), so never treat it as a compatibility guarantee on its own.
 - System notifications need a **secure context** — `http://127.0.0.1:3080` or `localhost` works; over a **LAN IP** the browser's Notification API is unavailable (a browser restriction, not a plugin issue)
 
@@ -250,7 +250,7 @@ The plugin has **two halves** running in different processes, exchanging configu
 - `ctx.inject(["settings"], …)` — declares "this plugin ships its own page": `settings.configure({ auto: false }, ctx.fiber)`. The owner must be the plugin's own fiber (`describe()` looks the policy up by `entry.fiber`, and the `inject` child is a different fiber)
 - `ctx.inject(["webServer"], …)` — mounts the sound route. When the service is absent the route is not mounted and the browser half falls back to the built-in chime
 
-**The settings contract (since 0.1.7 — the easiest thing to break silently here)**:
+**The settings contract (since 0.1.7 — re-verified line by line on 0.2.0-rc.1, and the easiest thing to break silently here)**:
 
 - The form is derived from the **plugin's own Config**: dsh-settings' `describe()` reads the entry fiber's `runtime.Config`, and the entry id is the namespace — the plugin **no longer registers a namespace** (the old `settings.register(ns, schema)` was removed in 0.1.7).
 - **Every field must be `.volatile()`**: `volatileForm()` only projects fields under the nearest volatile ancestor, so one unmarked field disappears from the settings page entirely (`test/host-half.smoke.mjs` asserts this field by field). `.volatile()` requires **schemastery ≥ 3.18.4**.
@@ -264,6 +264,7 @@ The plugin has **two halves** running in different processes, exchanging configu
 |---|---|---|
 | `configForms` | `@deepseek-ai/dsh-client-ui-settings` | `configForms.get(entryId)` reads and writes settings (the old `settingsScope` was removed in 0.1.7); the snapshot carries `status` / `writable` |
 | `sessions` | `@deepseek-ai/dsh-api-session-controller/client` | Session list snapshot: `origin` / `running` / `displayTitle` |
+| `uiWorkspace` | `@deepseek-ai/dsh-client-ui-workspace` | `openSession(sessionId)`: jump to that session when a notification is clicked. Taken through a lazy `ctx.inject(["uiWorkspace"])` (the host has **no** `sessions.open`); if the service is absent the click simply does not navigate — the plugin still loads |
 | `uiSession` | `@deepseek-ai/dsh-client-ui-session` | `sessionStatus`: `Map<sessionId, { running, pendingInteraction, completionUnread }>` — 0.1.7 removed both the row fields `completed` / `pendingInteraction` and the `pendingInteractions` store; the official workspace session rows use the same mapping (`completed` ≡ `completionUnread`) |
 
 The sound route is deliberately narrow: only `^[a-z0-9-]+\.mp3$` filenames are served (no path traversal), and because the audio is a package constant it is cached `immutable`.

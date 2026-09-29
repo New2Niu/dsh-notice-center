@@ -431,12 +431,15 @@ const ctx = {
         listListeners.push(fn);
         return () => {};
       }
-    },
-    open: (id) => opened.push(id)
+    }
+    /* 故意不给 sessions.open 桩：宿主从来没有这个方法（旧代码调它全靠 try/catch 吞错），
+       给了桩就等于把这个 bug 固化进测试。跳转走 uiWorkspace.openSession（见第 25 节）。 */
   },
   configForms: { get: () => scope },
   inject: (deps, callback) => {
     if (deps.includes("uiSession")) callback({ uiSession: { sessionStatus } });
+    /* 通知点击的跳转能力（0.2.0 的 uiWorkspace.openSession）—— 服务缺席时插件保持 no-op。 */
+    if (deps.includes("uiWorkspace")) callback({ uiWorkspace: { openSession: (id) => opened.push(id) } });
   },
   effect: (fn) => {
     fn();
@@ -1457,6 +1460,26 @@ check("24c 本次会话已经问过 → 再交互不重复弹窗", FakeNotificat
    （点了 × / Esc）时权限仍是 default，下次刷新页面必须还能自动问一次；
    上一版把标记落了盘，于是"点了 × 再刷新就永远不问了"。 */
 check("24d 全程不落盘任何「已问过」标记（没做选择就等于还能再问）", fakeStorage.get("dsh-notice-center:v1:permission-asked") === void 0, JSON.stringify(fakeStorage.get("dsh-notice-center:v1:permission-asked")));
+
+/* ==================== 25. 点通知跳到对应会话 ==================== */
+/* 0.2.0-rc.1 实测：跳转能力在 `uiWorkspace.openSession(target)` 上，宿主从来没有
+   `sessions.open` —— 旧代码那句调用一直被 try/catch 吞掉，点通知只聚焦窗口不跳转。
+   这条断言钉住「点击真的调了 openSession，且传的是这条通知对应的 sessionId」。 */
+reset();
+settingsValue.notifyEnabled = true;
+visibility = "hidden";
+focused = false;
+opened.length = 0;
+runToDone("click-jump", "点我跳转会话");
+await settle();
+/* 20d 为模拟「刷新」又 apply 了一次且没 dispose 旧实例 —— 那之后每次完成会弹两条
+   （两个实例各弹一条，既有断言都在 20d 之前，所以一直没暴露）。所以本节按「本会话
+   至少一条」断言，真正的重点是下面那条点击跳转。 */
+const jumpNotices = notifications.filter((n) => n.title === "点我跳转会话");
+check("25 本会话的完成通知发出来了", jumpNotices.length >= 1,
+	JSON.stringify(notifications.map((n) => [n.title, n.options?.body])));
+jumpNotices[0]?.onclick?.();
+check("25 点通知 → 跳到这条通知对应的会话", opened.length === 1 && opened[0] === "click-jump", JSON.stringify(opened));
 
 console.log(failed === 0 ? "\n全部通过" : `\n有 ${failed} 项失败`);
 process.exit(failed === 0 ? 0 : 1);
