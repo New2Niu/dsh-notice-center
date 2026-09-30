@@ -116,7 +116,7 @@
 
 ### 前置要求
 
-- **官方版本的 DeepSeek Harness**：当前代码要求 **`0.2.0-rc.1+`**（`engines.dsh` = `>=0.2.0-rc.1 <0.3.0-0`，只验证过 0.2.0-rc.1 这一条线，0.1.x 不再兼容）；npm 上已发布的 `1.4.x` 要求 `0.1.7-rc.2+`，`1.3.x` 支持 `0.1.2-rc.1+`
+- **官方版本的 DeepSeek Harness**：当前代码要求 **`0.2.0-rc.2+`**（`engines.dsh` = `>=0.2.0-rc.2 <0.3.0-0`，已在 **0.2.0-rc.2** 上逐条验证，0.2.0-rc.1 与 0.1.x 不再兼容）；npm 上已发布的 `1.4.x` 要求 `0.1.7-rc.2+`，`1.3.x` 支持 `0.1.2-rc.1+`
   - 兼容范围写在 `engines.dsh` 与 `@deepseek-ai/dsh-*` peer 上，由 `test/compat-range.smoke.mjs` 守护。两层判定按宿主版本自动分流：**插件市场不会把不兼容的版本推给旧宿主，DSH 核心在加载前也会拒绝它**——旧宿主原地留在旧版，不会收到更新提示。
   - 版本闸门只比版本号，查不出 API 被删（0.1.7 删掉了 `settings.register`，旧声明在那上面照样 PASS），所以别只靠它当兼容性保障。
 - 系统通知需要**安全上下文**——`http://127.0.0.1:3080` 或 `localhost` 可用；用**局域网 IP** 访问时浏览器的 Notification API 不可用（这是浏览器限制，不是插件问题）
@@ -250,7 +250,7 @@ dsh plugin --profile web remove dsh-notice-center
 - `ctx.inject(["settings"], …)` —— 声明「本插件自带设置页」：`settings.configure({ auto: false }, ctx.fiber)`。owner 必须是插件自身的 fiber（`describe()` 按 `entry.fiber` 查这份策略，而 `inject` 子 fiber 是另一个 fiber）
 - `ctx.inject(["webServer"], …)` —— 挂载音效路由。服务缺席时不挂载，浏览器半自动回退到内置合成音
 
-**设置契约（0.1.7 起，0.2.0-rc.1 上逐条复核仍成立，这是本插件最容易静默踩坏的地方）**：
+**设置契约（0.1.7 起，0.2.0-rc.1 / 0.2.0-rc.2 上逐条复核仍成立，这是本插件最容易静默踩坏的地方）**：
 
 - 表单由**插件自己的 Config** 派生：dsh-settings 的 `describe()` 读入口 fiber 的 `runtime.Config`，条目 id 就是命名空间 —— 插件**不再注册命名空间**（旧的 `settings.register(ns, schema)` 在 0.1.7 已删除）。
 - **每个字段都要 `.volatile()`**：`volatileForm()` 只投影「最近的可变祖先」下的字段，漏标一个就等于那个设置项在设置页里整条消失（`test/host-half.smoke.mjs` 为此逐字段断言）。`.volatile()` 需要 **schemastery ≥ 3.18.4**。
