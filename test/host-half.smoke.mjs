@@ -91,7 +91,7 @@ check("插件对象带 Config（设置表单与写入校验的投影源）", plu
 check("具名导出 Config 与 schema 是同一份", mod.Config === mod.NoticeSettingsSchema);
 const dict = mod.NoticeSettingsSchema.dict ?? {};
 const fields = Object.keys(dict);
-check("schema 字段数 = 11", fields.length === 11, `${fields.length}: ${fields.join(",")}`);
+check("schema 字段数 = 11（通知 8 项 + 颜色 3 项）", fields.length === 11, `${fields.length}: ${fields.join(",")}`);
 const notVolatile = fields.filter((key) => dict[key].meta?.volatile !== true);
 check("每个字段都标了 .volatile()（漏标＝设置项消失）", notVolatile.length === 0, notVolatile.join(","));
 check("声明了「本插件自带设置页」：configure({ auto: false })", configured?.auto === false, JSON.stringify(configured));

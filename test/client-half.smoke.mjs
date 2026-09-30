@@ -282,6 +282,8 @@ const primitivesExports = new Set([
   "Tooltip",
   "IconChevronDownOutlineRegular",
   "IconRefreshOutlineRegular",
+  /* 桌面端说明行用的信息图标（0.2.0-rc.2 实测导出存在：IconInfoOutlineRegular）。 */
+  "IconInfoOutlineRegular",
   "IconQuestionOutlineRegular",
   "IconWarningOutlineRegular"
 ]);

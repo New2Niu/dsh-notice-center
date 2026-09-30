@@ -23,6 +23,7 @@
 - [为什么需要它](#为什么需要它)
 - [功能特性](#功能特性)
 - [安装](#安装)
+- [桌面端适配](#桌面端适配)
 - [上手三步](#上手三步)
 - [设置项详解](#设置项详解)
 - [常见问题](#常见问题)
@@ -93,7 +94,23 @@
 - **可常驻**：关掉「自动隐藏」后，通知会一直留在屏幕上，直到你点掉它
 - 通知图标跟随你配置的状态灯颜色
 
-### 3. 提示音
+### 3. 桌面端适配
+
+桌面端**没有标签页**，所以鲸鱼状态灯那套在这里没有意义；插件会识别出桌面端并切换形态：
+
+| | 浏览器 | 桌面端（DeepSeek Harness.app / `dsh desktop`） |
+|---|---|---|
+| 鲸鱼状态灯 | 有（三色可配） | **无**——窗口没有标签页图标，设置页里换成一段说明 |
+| 系统通知 | 有，`Notification` 权限要用户授权 | 有，**权限由壳直接放行**（非 media 权限一律允许），不需要手势、也没有授权窗 |
+| 通知授权没拿到时 | chip 教你去地址栏 / 站点设置 | chip 改成**系统设置指引**（通知由操作系统决定） |
+| 自证入口 | 授权成功时的「通知已开启」确认 | 设置页有**「发送测试通知」**按钮，随时可自证 |
+| 首次手势自动授权 | 有 | **没有**（没有授权窗可弹，请求只会是无意义的调用） |
+
+- 桌面端面板只多两样东西：一段说明 + 一枚「发送测试通知」按钮。
+  **刻意没有「打开系统设置」按钮**：Electron 壳的 `setWindowOpenHandler` 只对 `http(s)` 调 `shell.openExternal`，其余协议一律拒绝且不外开，`window.open(系统设置深链)` 会被静默丢弃；preload 暴露的 `dshDesktop` 里也没有「打开外部 URL」的能力。放一个点了没反应的按钮比不放更糟，所以设置页只给文字指引（系统设置 → 通知 → DeepSeek Harness）。
+- 通知的标题、正文、聚合、提示音、点击跳转与浏览器端**完全同一条代码路径**，不会有第二套行为。
+
+### 4. 提示音
 
 完成与待处理各有独立下拉，共 **47 个条目**：2 个插件内置合成音 + 45 个取自 opencode 内置音效库的 mp3。
 
@@ -119,13 +136,24 @@
 - **官方版本的 DeepSeek Harness**：当前代码要求 **`0.2.0-rc.2+`**（`engines.dsh` = `>=0.2.0-rc.2 <0.3.0-0`，已在 **0.2.0-rc.2** 上逐条验证，0.2.0-rc.1 与 0.1.x 不再兼容）；npm 上已发布的 `1.4.x` 要求 `0.1.7-rc.2+`，`1.3.x` 支持 `0.1.2-rc.1+`
   - 兼容范围写在 `engines.dsh` 与 `@deepseek-ai/dsh-*` peer 上，由 `test/compat-range.smoke.mjs` 守护。两层判定按宿主版本自动分流：**插件市场不会把不兼容的版本推给旧宿主，DSH 核心在加载前也会拒绝它**——旧宿主原地留在旧版，不会收到更新提示。
   - 版本闸门只比版本号，查不出 API 被删（0.1.7 删掉了 `settings.register`，旧声明在那上面照样 PASS），所以别只靠它当兼容性保障。
-- 系统通知需要**安全上下文**——`http://127.0.0.1:3080` 或 `localhost` 可用；用**局域网 IP** 访问时浏览器的 Notification API 不可用（这是浏览器限制，不是插件问题）
+- 系统通知需要**安全上下文**——`http://127.0.0.1:3080` 或 `localhost` 可用；用**局域网 IP** 访问时浏览器的 Notification API 不可用（这是浏览器限制，不是插件问题）。**桌面端不受这条限制**（`dsh-app://app` 是安全上下文，权限由壳放行）
 
 ### 方式一：从 npm 安装（推荐）
+
+Web（浏览器界面）：
 
 ```sh
 dsh plugin --profile web add dsh-notice-center
 ```
+
+桌面端（DeepSeek Harness.app）：
+
+```sh
+dsh plugin --profile desktop add dsh-notice-center
+```
+
+> 两个 profile 是**各自独立**的安装位置：在浏览器界面里装了，桌面端不会自动有；反之亦然。想两边都用就装两次（设置也各存各的）。
+> 桌面端请**先完全退出应用**再执行该命令——`--profile desktop` 由桌面端进程独占，正在运行时 profile 目录被它管理（应用会提示「先退出再操作」）。
 
 包页：<https://www.npmjs.com/package/dsh-notice-center>（`latest` 为稳定版，预发布版在 `next` 通道，用 `dsh-notice-center@next` 装）
 
@@ -137,6 +165,8 @@ dsh plugin --profile web add github:SCP-QQ/dsh-notice-center
 dsh plugin --profile web add git+ssh://git@github.com/SCP-QQ/dsh-notice-center.git
 ```
 
+把 `--profile web` 换成 `--profile desktop` 即装到桌面端（下同）。
+
 ### 方式三：从 tarball 安装（离线 / 内网分发）
 
 ```sh
@@ -144,18 +174,27 @@ npm pack                                        # 生成 dsh-notice-center-<版�
 dsh plugin --profile web add ./dsh-notice-center-<版本>.tgz
 ```
 
+桌面端可以本地 link（改代码时最方便）：
+
+```sh
+# 在 ~/.dsh/profiles/desktop/package.json 里
+#   dependencies:     "dsh-notice-center": "link:/Users/you/Documents/project/dsh-notice-center"
+#   dsh.profile.bundles 数组里加 "dsh-notice-center"
+cd ~/.dsh/profiles/desktop && pnpm install
+```
+
 ### 方式四：本地 link（改代码时用）
 
 在 profile 的 `package.json` 里：`dependencies` 加 `"dsh-notice-center": "link:<项目目录>"`，`dsh.profile.bundles` 加 `"dsh-notice-center"`，然后在 profile 目录跑 `pnpm install`。
 
-> **四种方式装完都要重启 Harness 才生效。**
+> **四种方式装完都要重启 Harness / 桌面端才生效。**
 > 从 npm / GitHub 安装时不需要额外提供任何 `@deepseek-ai/*` 包——宿主半的运行时依赖只有 `@deepseek-ai/schemastery`（npm 上有）。
 
 ### 卸载
 
 ```sh
 dsh plugin --profile web remove dsh-notice-center
-```
+# 桌面端同理：dsh plugin --profile desktop remove dsh-notice-center
 
 移除依赖与 `dsh.profile.bundles` 条目后重启，即无残留。
 
@@ -179,7 +218,9 @@ dsh plugin --profile web remove dsh-notice-center
    | 已授权 | 不显示（行保持干净） | — |
 
    开关本身始终可切（未授权时也能把通知关掉，关掉后就不会再自动请求）；你在站点设置里改完权限回到页面，chip 会立刻跟上。
-3. **按需微调** —— 展开两个分组：调颜色、选音效、调音量、开关「前台提醒」/「自动隐藏」
+
+   > **桌面端不一样**：没有授权窗、没有地址栏，权限由壳直接放行。所以第 2 步在桌面端是「打开设置 → 点一下**发送测试通知**」：能弹出来就说明通了；弹不出来就去**系统设置 → 通知 → DeepSeek Harness** 打开允许通知（插件**无法**替你打开那个面板 —— 壳不允许，见上文「桌面端适配」）。
+3. **按需微调** —— 展开两个分组：调颜色、选音效、调音量、开关「前台提醒」/「自动隐藏」（桌面端只有「系统通知」这一组，颜色那组换成桌面端说明）
 
 <img src="docs/images/settings.png" width="440" alt="通知中心设置页">
 
@@ -189,12 +230,12 @@ dsh plugin --profile web remove dsh-notice-center
 
 | 分组 | 设置项 | 配置键 | 默认值 | 说明 |
 |---|---|---|---|---|
-| 鲸鱼状态灯 | 总开关 | `colorsEnabled` | 开 | 关闭后保持官方原版图标 |
+| 鲸鱼状态灯 | 总开关 | `colorsEnabled` | 开 | 关闭后保持官方原版图标（**桌面端不展示这一组**） |
 | | 完成 | `green` | `#22C55E` | 完成状态灯颜色（官方侧边栏色） |
 | | 待处理 | `amber` | `#F59E0B` | 待处理状态灯颜色（官方侧边栏色） |
 | | 默认色 | `black` | 未设置 | 不设置＝沿用官方原版 `/favicon.svg` |
-| 系统通知 | 总开关 | `notifyEnabled` | **开** | 默认开启；首次交互自动请求浏览器授权，未授权时开关下方给状态 chip |
-| | 自动隐藏 | `notifyAutoHide` | 开 | 关＝通知常驻屏幕，需手动关闭 |
+| 系统通知 | 总开关 | `notifyEnabled` | **开** | 默认开启；首次交互自动请求浏览器授权（桌面端无此流程），未授权时开关下方给状态 chip |
+| | 自动隐藏 | `notifyAutoHide` | 开 | 关＝通知常驻屏幕，需手动关闭（最终仍由系统通知中心决定） |
 | | 前台提醒 | `notifyForeground` | 关 | 开＝你正看着页面时也提醒 |
 | | 提示音 | `notifySound` | 开 | 开启后静音系统提示音，改播插件音效 |
 | | 音量 | `notifyVolume` | `0.6` | 0–1 |
@@ -219,6 +260,9 @@ dsh plugin --profile web remove dsh-notice-center
 | 通知一闪而过看不到 | 关掉「自动隐藏」，通知会常驻直到你点掉它 |
 | 没有声音 | 依次查：提示音开关、音量是否为 0、系统音效路由是否可用（不可用时会回退内置合成音，不会完全没声） |
 | 通知被系统吞掉 | Windows「专注助手 / 勿扰」会拦截，插件无法感知 |
+| **桌面端**装完看不到鲸鱼状态灯的设置 | 桌面端**故意不画**：应用窗口没有标签页图标。设置页里那一段「桌面端提醒方式」就是它的位置 |
+| **桌面端**不弹通知 | 插件侧条件与浏览器相同（开关打开 + 触发时不在前台），但权限在**系统**手里：设置页点「发送测试通知」，收不到就去 系统设置 → 通知 → DeepSeek Harness 打开「允许通知」（macOS 首次会弹一次系统授权，选「允许」；选过「不允许」就得手动改回来） |
+| **桌面端**想快速打开系统通知设置 | 插件没有这个按钮（壳不允许插件唤起系统设置，详见「桌面端适配」）。手动路径：macOS 系统设置 → 通知 → DeepSeek Harness。你也可以自己用命令行打开：`open "x-apple.systempreferences:com.apple.Notifications-Settings.extension"` |
 
 ## 已知限制
 
@@ -228,6 +272,8 @@ dsh plugin --profile web remove dsh-notice-center
 - **系统级勿扰模式会吞掉通知**（Windows 专注助手等），插件无法感知
 - **自动隐藏的时长不可配**——Web Notification 规范没有时长参数，桌面端由系统决定（约 5–20 秒）
 - **通知卡片的外观不可定制**——卡片由浏览器渲染，没有 CSS / 主题入口，只能控制标题、正文与图标
+- **桌面端没有状态灯替代品**——插件改不动 Electron 壳（`app.asar` 里的主进程代码），所以拿不到 Dock 角标 / 托盘角标；桌面端的主信号就是系统通知本身
+- **桌面端无法唤起系统设置**——壳只把 `http(s)` 交给系统外开，`x-apple.systempreferences:` 这类深链会被丢弃（1.5.0 试过，点了没反应，已删）；只能手动去系统设置里开通知
 
 ---
 
@@ -269,17 +315,27 @@ dsh plugin --profile web remove dsh-notice-center
 
 音效路由的安全约束：只放行 `^[a-z0-9-]+\.mp3$` 的文件名（杜绝路径穿越），音频是随包常量故用 `immutable` 长缓存。
 
+**桌面端的平台判定**（`lib/client.cjs` 的 `isDesktopClient`）：壳的 preload 只在 `dsh-app://app` 主框架上放完整产品 API（`deviceInfo` / `browser` / `keyboard` / `shortcuts` / `updates`），iframe 只拿到 `{ protocolVersion: 1 }` —— 所以判定必须同时满足 `protocolVersion === 1` 与「有 `deviceInfo` 函数」。官方几个包（`dsh-client-shortcuts`、`dsh-client-ui-chat`、`dsh-client-product-analytics`…）用的是同一条信号（`"dshDesktop" in globalThis`）。
+
+桌面端与壳的三条硬约束（决定了分支只能这么做）：
+
+1. **壳不允许唤起系统设置**：`setWindowOpenHandler` 只对 `http(s)` 调 `shell.openExternal`，其余协议 `{ action: "deny" }` 且不外开，`will-navigate` 同样只放行 `http(s)`，preload 的 `dshDesktop` 也没有外开能力 —— 所以插件**不做**「打开系统设置」入口，只给文字指引（1.5.0 曾做过深链按钮，实测点了没反应，已删除）；
+2. **壳没有 Dock / 托盘角标能力**，插件也改不动 `app.asar` 里的主进程 —— 桌面端没有状态灯的替代品；
+3. **壳的 session 权限处理器对非 media 一律放行**（`main.js` 的 `installMicrophonePermissions`）—— 页面侧没有授权窗可弹，所以桌面端跳过「首次手势请求授权」，`Notification.permission` 只作参考。
+
 ## 目录结构
 
 ```
-package.json                    包元数据（scripts: test / test:host / test:client）
+package.json                    包元数据（scripts: test / test:host / test:client / test:desktop / test:compat）
 cordis.patch.yml                bundle patch 层（insert id: notice-center）
 lib/index.mjs                   宿主半：settings schema + 音效静态路由
-lib/client.cjs                  浏览器半：favicon 状态机 + 通知状态机 + 音效库 + 设置页
+lib/client.cjs                  浏览器半 / 桌面端渲染进程：状态机 + 通知 + 音效库 + 设置页
 assets/audio/*.mp3              45 个 opencode 音效（MIT，来源见 assets/audio/README.md）
 docs/images/                    README 截图、主图与社交预览图
-test/host-half.smoke.mjs        宿主半冒烟（164 行）
-test/client-half.smoke.mjs      浏览器半冒烟：状态机 + 设置页真渲染（687 行）
+test/host-half.smoke.mjs        宿主半冒烟
+test/client-half.smoke.mjs      浏览器半冒烟：状态机 + 设置页真渲染
+test/desktop-half.smoke.mjs     桌面端分支冒烟：判定 / 状态灯停画 / 测试通知 / 权限 chip
+test/compat-range.smoke.mjs     兼容范围（engines.dsh / peer / files 清单）
 .github/workflows/test.yml      CI：push / PR 跑 pnpm test
 .github/workflows/publish.yml   发布：打 tag 触发，OIDC 无令牌
 ```
@@ -320,27 +376,33 @@ npm test              # 宿主半 + 浏览器半冒烟
 | `lib/client.cjs`（浏览器半） | **不用**，刷新页面最干净 | 客户端 HMR 会 stat-poll 到 bundle 变化并通知浏览器重载该插件 |
 | `lib/index.mjs`（宿主半） | **必须重启** | 宿主半热重载依赖 `cordis-plugin-hmr`（需 loader 带 `--expose-internals`），实测未生效。**改 schema（增删设置项）同样必须重启**——否则设置页写入过不了校验，表现为「开关点不动」 |
 | 首次安装、任何改名 | **必须重启** | 插件树与 bundle 列表变了 |
+| 桌面端（`--profile desktop`，两种半都算） | **必须重启桌面端** | 桌面端没有「刷新页面」这个动作，客户端 bundle 也只在启动时装配；改完请完全退出应用再启动 |
 
-调试提示：浏览器半的报错都在 DevTools Console；宿主半注册成功会在 Harness 控制台打一行 `dsh-notice-center: settings namespace "notice-center" registered`。
+调试提示：浏览器半的报错都在 DevTools Console；宿主半注册成功会在 Harness 控制台打一行 `dsh-notice-center: settings entry "notice-center" served from the Config schema`。桌面端的渲染进程同样有 DevTools（窗口菜单里打开），`isDesktopClient()` 的判定、通知构造失败都会打在那里。
 
 ## 测试
 
 ```sh
-npm test            # 两个都跑（CI 跑的也是这个）
-npm run test:host   # 只跑宿主半
-npm run test:client # 只跑浏览器半
+npm test              # 四个都跑（CI 跑的也是这个）
+npm run test:host     # 只跑宿主半
+npm run test:client   # 只跑浏览器半
+npm run test:desktop  # 只跑桌面端分支
+npm run test:compat   # 只跑兼容范围
 ```
 
-两个冒烟测试都是**零依赖、纯 Node**，不需要浏览器：
+四个冒烟测试都是**零依赖、纯 Node**，不需要浏览器：
 
-- **宿主半**（164 行）：`apply()` 真执行一遍、断言只注入预期服务、schema 默认值与校验、音效路由（能取到 mp3 / 不存在 404 / 拒绝路径穿越 / 随包 45 个齐全）、settings.yaml 存量配置过 schema 且**逐项原样保留**
-- **浏览器半**（687 行）：桩掉 `window.__ModuleLoader__` / `document` / `Notification`，evaluate bundle 后取 factory，用假 `ctx` 装配 `apply()`，然后驱动状态跃迁断言 Notification 的构造参数；设置页用**记录型桩**真渲染（React 元素树），断言开关顺序、只写对应字段、折叠行为、页脚等
+- **宿主半**：`apply()` 真执行一遍、断言只注入预期服务、schema 默认值与校验、音效路由（能取到 mp3 / 不存在 404 / 拒绝路径穿越 / 随包 45 个齐全）、settings.yaml 存量配置过 schema 且**逐项原样保留**
+- **浏览器半**：桩掉 `window.__ModuleLoader__` / `document` / `Notification`，evaluate bundle 后取 factory，用假 `ctx` 装配 `apply()`，然后驱动状态跃迁断言 Notification 的构造参数；设置页用**记录型桩**真渲染（React 元素树），断言开关顺序、只写对应字段、折叠行为、页脚等
+- **桌面端**：同一份 bundle 换 `globalThis.dshDesktop` 再装一遍，断言「什么算桌面端」（浏览器 / 只有 `protocolVersion` 的 iframe / 协议版本不匹配都**不算**）、桌面端**不画**状态灯分组、测试通知按钮真的发通知、权限 chip 是指引而不是授权按钮、不挂首次手势授权
 
 被测试钉死的不变量（改代码时别破坏）：
 
 - `lib/client.cjs` 里的 `PLUGIN_VERSION` / `PLUGIN_NAME` / `PLUGIN_REPO` 必须与 `package.json` 一致
 - 音效库 `SOUND_PACKS` 必须与 `assets/audio/` 里的文件**一一对应**；新增音效要同步改 `lib/client.cjs` 与 `test/client-half.smoke.mjs` **两处**
-- `zh` / `en` 两套文案的 key 集合必须一致
+- `zh` / `en` 两套文案的 key 集合必须一致（`test/client-half.smoke.mjs` 与 `test/desktop-half.smoke.mjs` 都断言）
+- 桌面端判定只能认「`protocolVersion === 1` **且** 有 `deviceInfo` 函数」：少判一个就会把壳内嵌的 iframe 也当成桌面端主框架
+- 设置页里凡是**要跨出 apply 作用域**的东西（图标、取色、测试通知）都必须是模块级函数，参数由调用方注入 —— 组件不在 `apply` 闭包里，直接引用 `apply` 内的局部函数会被 `ReferenceError` 打崩整页（1.5.0 开发时就踩过一次）
 
 ## 发版
 
@@ -395,6 +457,9 @@ npm run test:client # 只跑浏览器半
 4. **通知时长来自观察 `running` 边沿**——刷新页面时已经在跑的会话算不出起点，就不显示这个数（不猜）
 5. **宿主半保持零 `@deepseek-ai` 运行时依赖**——只 import `schemastery`，否则 registry 安装会因 peer 解析失败而挂掉
 6. **音效路由只放行 `^[a-z0-9-]+\.mp3$`**——文件名直接参与 path join，必须白名单
+7. **桌面端只信「主框架的产品 API」**——`protocolVersion === 1` 且有 `deviceInfo` 才算桌面端；壳内嵌 iframe 拿到的 `{ protocolVersion: 1 }` 不算，否则子框架里也会走桌面分支
+8. **设置页组件不共享 `apply` 的闭包**——跨作用域的能力（图标、取色、测试通知）一律做成模块级函数、参数由调用方传；直接引用 `apply` 内的局部函数会把整页打崩
+9. **桌面端不画状态灯**——没有标签页图标就别硬塞替代品（壳不提供 Dock/托盘角标，插件也改不动主进程）；桌面端的主信号就是系统通知
 
 ## 反馈与贡献
 

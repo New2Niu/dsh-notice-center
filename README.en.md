@@ -23,6 +23,7 @@
 - [Why you need it](#why-you-need-it)
 - [Features](#features)
 - [Installation](#installation)
+- [Desktop adaptation](#desktop-adaptation)
 - [Getting started in three steps](#getting-started-in-three-steps)
 - [Settings reference](#settings-reference)
 - [Troubleshooting](#troubleshooting)
@@ -94,7 +95,23 @@ Other behaviour:
 - **Optional persistence**: turn off **Auto hide** and the notification stays on screen until you dismiss it
 - The notification icon follows your configured status-light colours
 
-### 3. Sounds
+### 3. Desktop adaptation
+
+The desktop app has **no tabs**, so the whale status light means nothing there; the plugin detects the shell and switches shape:
+
+| | Browser | Desktop (DeepSeek Harness.app / `dsh desktop`) |
+|---|---|---|
+| Whale status light | Yes (three configurable colours) | **None** — a window has no tab icon, so the settings page shows a short note instead |
+| System notifications | Yes, the `Notification` permission is yours to grant | Yes, **the shell grants it** (every non-media permission is allowed): no gesture, no prompt |
+| When the permission is missing | The chip tells you where the browser setting lives | The chip becomes a **system-settings pointer** (the OS decides) |
+| Self-check | The "Notifications enabled" confirmation | A **"Send a test notification"** button in the settings page |
+| First-gesture permission request | Yes | **No** (there is no prompt to show; the call would be pointless) |
+
+- The desktop panel adds exactly two things: a note and a **Send a test notification** button.
+  There is deliberately **no "open system settings" button**: the Electron shell's `setWindowOpenHandler` calls `shell.openExternal` only for `http(s)` and denies every other scheme without a fallback, so `window.open(<system-settings deep link>)` is dropped silently; the preload's `dshDesktop` exposes no "open external URL" either. A button that does nothing is worse than no button, so the panel only carries text guidance (System Settings → Notifications → DeepSeek Harness).
+- Title, body, aggregation, sound, and click-to-open behave **exactly** as in the browser: one code path, not two.
+
+### 4. Sounds
 
 Finished and pending each have their own dropdown, **47 entries** in total: 2 built-in synthesised chimes plus 45 mp3s taken from opencode's bundled sound library.
 
@@ -124,9 +141,20 @@ Finished and pending each have their own dropdown, **47 entries** in total: 2 bu
 
 ### Option 1: from npm (recommended)
 
+Browser UI:
+
 ```sh
 dsh plugin --profile web add dsh-notice-center
 ```
+
+Desktop app:
+
+```sh
+dsh plugin --profile desktop add dsh-notice-center
+```
+
+> The two profiles are **separate install locations**: installing for the browser UI does not add it to the desktop app, and vice versa. Install twice (settings are stored per profile) if you want both.
+> Quit the desktop app **completely** before running the desktop command — the `desktop` profile is owned by the running app, which asks you to quit first.
 
 Package page: <https://www.npmjs.com/package/dsh-notice-center> (`latest` is stable; prereleases go to the `next` tag — install with `dsh-notice-center@next`)
 
@@ -138,6 +166,8 @@ dsh plugin --profile web add github:SCP-QQ/dsh-notice-center
 dsh plugin --profile web add git+ssh://git@github.com:SCP-QQ/dsh-notice-center.git
 ```
 
+Swap `--profile web` for `--profile desktop` to install into the desktop app (same for the options below).
+
 ### Option 3: from a tarball (offline / internal distribution)
 
 ```sh
@@ -145,17 +175,27 @@ npm pack                                        # produces dsh-notice-center-<ve
 dsh plugin --profile web add ./dsh-notice-center-<version>.tgz
 ```
 
+For the desktop app, a local link is the most convenient while editing:
+
+```sh
+# in ~/.dsh/profiles/desktop/package.json
+#   dependencies:        "dsh-notice-center": "link:/Users/you/Documents/project/dsh-notice-center"
+#   dsh.profile.bundles: add "dsh-notice-center"
+cd ~/.dsh/profiles/desktop && pnpm install
+```
+
 ### Option 4: local link (while editing the code)
 
 In the profile's `package.json`: add `"dsh-notice-center": "link:<project dir>"` to `dependencies` and `"dsh-notice-center"` to `dsh.profile.bundles`, then run `pnpm install` inside the profile directory.
 
-> **All four options require a Harness restart to take effect.**
+> **All four options require a Harness / desktop restart to take effect.**
 > Installing from npm / GitHub needs no extra `@deepseek-ai/*` packages from the profile — the host half's only runtime dependency is `@deepseek-ai/schemastery` (available on npm).
 
 ### Uninstall
 
 ```sh
 dsh plugin --profile web remove dsh-notice-center
+# same for the desktop app: dsh plugin --profile desktop remove dsh-notice-center
 ```
 
 Remove the dependency and the `dsh.profile.bundles` entry, then restart — nothing is left behind.
@@ -190,12 +230,12 @@ After that, whenever you switch away or minimise, a finished session or a pendin
 
 | Group | Setting | Key | Default | Notes |
 |---|---|---|---|---|
-| Whale status light | Master switch | `colorsEnabled` | on | When off, the stock icon is kept |
+| Whale status light | Master switch | `colorsEnabled` | on | When off, the stock icon is kept (**this group is not shown on desktop**) |
 | | Finished | `green` | `#22C55E` | Finished status-light colour (official sidebar colour) |
 | | Pending | `amber` | `#F59E0B` | Pending status-light colour (official sidebar colour) |
 | | Default colour | `black` | unset | Unset = keep the stock `/favicon.svg` |
-| System notifications | Master switch | `notifyEnabled` | **on** | On by default; the first interaction asks for browser permission, and a status chip appears below the switch while it is missing |
-| | Auto hide | `notifyAutoHide` | on | Off = the notification stays until you dismiss it |
+| System notifications | Master switch | `notifyEnabled` | **on** | On by default; the first interaction asks for browser permission (no such flow on desktop), and a status chip appears below the switch while it is missing |
+| | Auto hide | `notifyAutoHide` | on | Off = the notification stays until you dismiss it (the OS notification centre still has the final say) |
 | | Notify in the foreground | `notifyForeground` | off | On = also notify while you are looking at the page |
 | | Sound | `notifySound` | on | When on, the system sound is muted and the plugin sound plays |
 | | Volume | `notifyVolume` | `0.6` | 0–1 |
@@ -219,6 +259,9 @@ The settings page also shows a one-line footer at the very top with the plugin n
 | The notification flashes by too fast | Turn **Auto hide** off and it stays until dismissed |
 | No sound | Check in order: sound switch, volume not 0, whether the sound route is available (it falls back to the built-in chime, so it should never be fully silent) |
 | Notifications swallowed by the OS | Windows Focus Assist / Do Not Disturb intercepts them; the plugin cannot detect it |
+| **Desktop**: no whale status-light group | Deliberate: an app window has no tab icon. The "How the desktop app notifies you" note takes its place |
+| **Desktop**: no notifications at all | The plugin-side conditions match the browser (switch on + not in the foreground), but the permission belongs to the **system**: hit **Send a test notification** in the settings. If nothing appears, open System Settings → Notifications → DeepSeek Harness and allow notifications (macOS asks once on first use; picking *Don't Allow* means changing it by hand) |
+| **Desktop**: how do I open the system notification settings quickly? | The plugin has no such button (the shell forbids plugins from invoking system settings — see "Desktop adaptation"). Manually: macOS System Settings → Notifications → DeepSeek Harness. From a terminal you can also run `open "x-apple.systempreferences:com.apple.Notifications-Settings.extension"` |
 
 ## Known limitations
 
@@ -228,6 +271,8 @@ The settings page also shows a one-line footer at the very top with the plugin n
 - **System-level Do Not Disturb swallows notifications** (Windows Focus Assist etc.); the plugin cannot detect it
 - **The auto-hide duration is not configurable** — the Web Notification spec has no duration parameter; the desktop decides (roughly 5–20 seconds)
 - **The notification card cannot be styled** — the card is rendered by the browser with no CSS or theming hook; only title, body and icon are yours
+- **The desktop has no status-light substitute** — the plugin cannot touch the Electron shell (`app.asar` main process), so there is no dock badge or tray badge; system notifications themselves are the desktop signal
+- **The desktop cannot invoke system settings** — the shell hands only `http(s)` to the OS, so deep links such as `x-apple.systempreferences:` are dropped (tried in 1.5.0, clicking did nothing, removed); open notifications by hand in System Settings
 
 ---
 
@@ -269,17 +314,27 @@ The plugin has **two halves** running in different processes, exchanging configu
 
 The sound route is deliberately narrow: only `^[a-z0-9-]+\.mp3$` filenames are served (no path traversal), and because the audio is a package constant it is cached `immutable`.
 
+**Desktop platform detection** (`isDesktopClient` in `lib/client.cjs`): the shell preload exposes the full product API (`deviceInfo` / `browser` / `keyboard` / `shortcuts` / `updates`) only on the `dsh-app://app` main frame; an embedded iframe only gets `{ protocolVersion: 1 }`. The check therefore requires **both** `protocolVersion === 1` and a `deviceInfo` function — the same signal the official packages use (`"dshDesktop" in globalThis` in `dsh-client-shortcuts`, `dsh-client-ui-chat`, `dsh-client-product-analytics`, …).
+
+Three hard shell constraints shape the branches:
+
+1. **The shell does not let a plugin open system settings**: `setWindowOpenHandler` calls `shell.openExternal` only for `http(s)` and answers every other scheme with `{ action: "deny" }`; `will-navigate` allows `http(s)` alone; and the preload's `dshDesktop` has no external-open capability — so the plugin ships **no** "open system settings" entry point, only text guidance (1.5.0 briefly shipped a deep-link button; it did nothing when clicked and was removed);
+2. **The shell exposes no dock/tray badge**, and the plugin cannot patch the `app.asar` main process — the desktop has no status-light substitute;
+3. **The shell's session permission handler allows every non-media permission** (`installMicrophonePermissions` in `main.js`) — there is no prompt to show, so the desktop skips the first-gesture permission request and treats `Notification.permission` as advisory only.
+
 ## Project layout
 
 ```
-package.json                    package metadata (scripts: test / test:host / test:client)
+package.json                    package metadata (scripts: test / test:host / test:client / test:desktop / test:compat)
 cordis.patch.yml                bundle patch layer (insert id: notice-center)
 lib/index.mjs                   host half: settings schema + sound static route
-lib/client.cjs                  browser half: favicon machine + notification machine + sound library + settings page
+lib/client.cjs                  browser half / desktop renderer: state machines + notifications + sound library + settings page
 assets/audio/*.mp3              45 opencode sounds (MIT; see assets/audio/README.md)
 docs/images/                    README screenshots, banners and the social-preview card
-test/host-half.smoke.mjs        host-half smoke test (164 lines)
-test/client-half.smoke.mjs      browser-half smoke test: state machine + real settings-page render (687 lines)
+test/host-half.smoke.mjs        host-half smoke test
+test/client-half.smoke.mjs      browser-half smoke test: state machine + real settings-page render
+test/desktop-half.smoke.mjs     desktop-branch smoke test: detection / no status light / test notification / permission chip
+test/compat-range.smoke.mjs     compatibility range (engines.dsh / peers / files list)
 .github/workflows/test.yml      CI: runs pnpm test on push / PR
 .github/workflows/publish.yml   release: tag-triggered, OIDC, no token
 ```
@@ -310,7 +365,7 @@ Notifications deliberately carry **no `tag`**: the same session reuses the same 
 
 ```sh
 pnpm install          # the only runtime dependency is @deepseek-ai/schemastery
-npm test              # host-half + browser-half smoke tests
+npm test              # all four smoke tests
 ```
 
 **The restart rule has two halves — this is the easiest thing to trip over:**
@@ -320,27 +375,33 @@ npm test              # host-half + browser-half smoke tests
 | `lib/client.cjs` (browser half) | **No** — a page refresh is cleanest | Client HMR stat-polls the bundle and tells the browser to reload that plugin |
 | `lib/index.mjs` (host half) | **Yes, mandatory** | Host-half hot reload relies on `cordis-plugin-hmr` (needs the loader to run with `--expose-internals`), which does not work in practice. **Schema changes (adding/removing settings) also need a restart** — otherwise the settings page write fails validation, which looks like "the switch does nothing" |
 | First install, any rename | **Yes, mandatory** | The plugin tree and bundle list changed |
+| Desktop (`--profile desktop`, either half) | **Restart the desktop app** | There is no "refresh the page" there: the client bundle is assembled at startup only. Quit the app completely and start it again |
 
-Debugging: browser-half errors land in the DevTools console; a successful host-half registration logs `dsh-notice-center: settings namespace "notice-center" registered` to the Harness console.
+Debugging: browser-half errors land in the DevTools console; a successful host-half registration logs `dsh-notice-center: settings entry "notice-center" served from the Config schema` to the Harness console. The desktop renderer has DevTools too (open it from the window menu) — that is where `isDesktopClient()` decisions and notification construction failures show up.
 
 ## Tests
 
 ```sh
-npm test            # both (this is what CI runs)
-npm run test:host   # host half only
-npm run test:client # browser half only
+npm test              # all four (this is what CI runs)
+npm run test:host     # host half only
+npm run test:client   # browser half only
+npm run test:desktop  # desktop branch only
+npm run test:compat   # compatibility range only
 ```
 
-Both smoke tests are **zero-dependency, pure Node** — no browser needed:
+All four smoke tests are **zero-dependency, pure Node** — no browser needed:
 
-- **Host half** (164 lines): actually executes `apply()`, asserts only the expected services are injected, checks schema defaults and validation, exercises the sound route (serves an mp3 / 404 for unknown / rejects path traversal / all 45 packaged files present) and verifies that an existing `settings.yaml` passes the schema **with every field preserved verbatim**
-- **Browser half** (687 lines): stubs `window.__ModuleLoader__` / `document` / `Notification`, evaluates the bundle and takes its factory, assembles `apply()` with a fake `ctx`, then drives state transitions and asserts the `Notification` constructor arguments. The settings page is **really rendered** against a recording stub (React element tree), asserting switch order, that each control writes only its own field, collapse behaviour, the footer, and more
+- **Host half**: actually executes `apply()`, asserts only the expected services are injected, checks schema defaults and validation, exercises the sound route (serves an mp3 / 404 for unknown / rejects path traversal / all 45 packaged files present) and verifies that an existing `settings.yaml` passes the schema **with every field preserved verbatim**
+- **Browser half**: stubs `window.__ModuleLoader__` / `document` / `Notification`, evaluates the bundle and takes its factory, assembles `apply()` with a fake `ctx`, then drives state transitions and asserts the `Notification` constructor arguments. The settings page is **really rendered** against a recording stub (React element tree), asserting switch order, that each control writes only its own field, collapse behaviour, the footer, and more
+- **Desktop**: loads the same bundle with `globalThis.dshDesktop` set instead, asserting what counts as desktop (a plain browser, an iframe carrying only `protocolVersion`, and a mismatched protocol version all **do not**), that the status-light group is **not** rendered, that the test-notification button really raises a notification, that the permission chip is a pointer rather than a grant button, and that no first-gesture permission request is armed
 
 Invariants pinned by the tests — do not break these:
 
 - `PLUGIN_VERSION` / `PLUGIN_NAME` / `PLUGIN_REPO` in `lib/client.cjs` must match `package.json`
 - The `SOUND_PACKS` library must map **one-to-one** onto the files in `assets/audio/`; adding a sound means updating it in **two places**: `lib/client.cjs` and `test/client-half.smoke.mjs`
-- The `zh` and `en` dictionaries must have identical key sets
+- The `zh` and `en` dictionaries must have identical key sets (asserted by both `test/client-half.smoke.mjs` and `test/desktop-half.smoke.mjs`)
+- Desktop detection may only accept "`protocolVersion === 1` **and** a `deviceInfo` function": drop either half and the shell's embedded iframes count as the desktop main frame
+- Anything in the settings page that must reach **outside `apply`'s scope** (the icon, colour lookup, test notification, opening system settings) has to be a module-level function with the caller injecting its parameters — the component is not inside `apply`'s closure, and referencing an `apply`-local function there crashes the whole page with a `ReferenceError` (hit once while building 1.5.0)
 
 ## Releasing
 
@@ -394,6 +455,9 @@ Read these before changing code — each one came from a real bug:
 4. **The turn duration comes from observing the `running` edge** — a session already running when the page loads has no known start, so no duration is shown (never guessed)
 5. **The host half keeps zero `@deepseek-ai` runtime dependencies** — only `schemastery`, otherwise a registry install breaks on peer resolution
 6. **The sound route only allows `^[a-z0-9-]+\.mp3$`** — the filename goes straight into a path join, so it must be whitelisted
+7. **Desktop trust is main-frame only** — desktop means `protocolVersion === 1` **and** a `deviceInfo` function; the bare `{ protocolVersion: 1 }` an embedded iframe sees must not count, or child frames take the desktop branch too
+8. **The settings component shares no closure with `apply`** — anything crossing that boundary (icon, colour lookup, test notification) is a module-level function with caller-injected parameters; referencing an `apply`-local function crashes the whole page
+9. **No status light on desktop** — with no tab icon, do not bolt on a substitute (the shell offers no dock/tray badge and the plugin cannot patch the main process); system notifications are the desktop signal
 
 ## Feedback and contributing
 
