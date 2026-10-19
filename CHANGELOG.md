@@ -1,9 +1,17 @@
 # 更新记录
 
-每个**已发布**版本的改动都记在这里；本文件随包一起发布（`files` 里已包含），
-发版流程见 [README → 发版](./README.md#发版)。最上面一条就是 npm 上的当前版本。
+每个版本的改动都记在这里；本文件随仓库一起分发，
+发版流程见 [README → 发版与分发](./README.md#发版与分发)。最上面一条就是当前版本。
 
-约定：正式版发到 `latest`，`-rc.N` 只发 `next`（不动 `latest`）；括号里的短哈希是那次改动的提交。
+约定：版本号见 `package.json`；安装只走仓库地址（`github:New2Niu/dsh-notice-center`），
+需要固定版本时用 `#v<版本>` 形式的 tag。括号里的短哈希是那次改动的提交。
+
+## 未发布 — 文档与分发渠道调整
+
+- docs: README 按当前功能重新整理——补上「多标签页协同」「未读状态落盘」，桌面端适配升为独立章节
+- docs: 安装方式收敛为**只支持仓库地址安装**（`github:New2Niu/dsh-notice-center`），移除 npm / tarball / 本地 link 的说明
+- chore: 仓库地址统一为 `New2Niu/dsh-notice-center`（`package.json` 的 repository / homepage / bugs、设置页页脚链接、测试断言）
+- ci: 上游 npm 发布流水线加仓库守卫，本仓库打 tag 不会触发发布
 
 ## 1.5.0 — 2026-09-30
 

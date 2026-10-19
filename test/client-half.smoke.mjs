@@ -963,7 +963,7 @@ check("点箭头只折叠一次（不叠加整行点击）", chevronEvent.stoppe
    是「鲸鱼状态灯」上方那一行（官方 .options 自身没有标题），必须留在根节点子项的最前面，
    而不是随便挪到末尾；同时它不再是"贴底"那一版（没有 marginTop:auto）。 */
 const manifestVersion = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")).version;
-const repoUrl = "https://github.com/SCP-QQ/dsh-notice-center";
+const repoUrl = "https://github.com/New2Niu/dsh-notice-center";
 const sectionChildren = sectionTree?.props?.children;
 check("页脚是设置页第一项（「鲸鱼状态灯」上方那一行）", sectionChildren?.[0]?.props?.repo === repoUrl, JSON.stringify(sectionChildren?.[0]?.props?.name));
 check("页脚下方紧邻「鲸鱼状态灯」分组行", typeof sectionChildren?.[1]?.props?.onClick === "function" && sectionChildren?.[1]?.props?.style?.cursor === "pointer", JSON.stringify(Object.keys(sectionChildren?.[1]?.props ?? {})));

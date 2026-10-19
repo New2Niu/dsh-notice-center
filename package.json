@@ -57,11 +57,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/SCP-QQ/dsh-notice-center.git"
+    "url": "git+https://github.com/New2Niu/dsh-notice-center.git"
   },
-  "homepage": "https://github.com/SCP-QQ/dsh-notice-center#readme",
+  "homepage": "https://github.com/New2Niu/dsh-notice-center#readme",
   "bugs": {
-    "url": "https://github.com/SCP-QQ/dsh-notice-center/issues"
+    "url": "https://github.com/New2Niu/dsh-notice-center/issues"
   },
   "keywords": [
     "dsh",

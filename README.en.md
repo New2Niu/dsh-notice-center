@@ -2,8 +2,7 @@
 
 [中文](./README.md) | **English**
 
-[![test](https://github.com/SCP-QQ/dsh-notice-center/actions/workflows/test.yml/badge.svg)](https://github.com/SCP-QQ/dsh-notice-center/actions/workflows/test.yml)
-[![npm](https://img.shields.io/npm/v/dsh-notice-center.svg)](https://www.npmjs.com/package/dsh-notice-center)
+[![test](https://github.com/New2Niu/dsh-notice-center/actions/workflows/test.yml/badge.svg)](https://github.com/New2Niu/dsh-notice-center/actions/workflows/test.yml)
 
 <img src="docs/images/banner-en.jpg" alt="dsh-notice-center — Get Every Message, Never Miss a Thing" width="100%">
 
@@ -14,7 +13,8 @@
 | Package | `dsh-notice-center` |
 | Plugin instance id | `notice-center` |
 | Settings namespace | `notice-center` |
-| Install shapes | npm package / GitHub repo / tarball / local link — all four supported |
+| Install method | **Git repository URL only** (see [Installation](#installation)) |
+| Host requirement | DeepSeek Harness `0.2.0-rc.2` – `0.3.0` |
 
 ## Contents
 
@@ -23,7 +23,6 @@
 - [Why you need it](#why-you-need-it)
 - [Features](#features)
 - [Installation](#installation)
-- [Desktop adaptation](#desktop-adaptation)
 - [Getting started in three steps](#getting-started-in-three-steps)
 - [Settings reference](#settings-reference)
 - [Troubleshooting](#troubleshooting)
@@ -36,7 +35,7 @@
 - [Life of a notification](#life-of-a-notification)
 - [Local development](#local-development)
 - [Tests](#tests)
-- [Releasing](#releasing)
+- [Releasing and distribution](#releasing-and-distribution)
 - [Changelog](./CHANGELOG.md)
 - [Design constraints](#design-constraints)
 
@@ -70,6 +69,7 @@ Three colours are encoded directly into the tab icon, driven by **the same offic
 - Only **main sessions** count; subagents do not affect it
 - When both apply, **amber wins** — a pending interaction is the primary status, so a session stuck waiting on you is never masked by another session that just finished
 - All three colours are configurable (including the default colour: leave it unset to keep the stock icon)
+- Unread marks are **persisted locally**, so the green light survives a refresh (7-day expiry, at most 50 entries); opening the session clears it
 
 ### 2. System notifications
 
@@ -77,7 +77,7 @@ Two events raise a notification, and by default **only while you are not looking
 
 | Event | Trigger | What the notification says |
 |---|---|---|
-| **Finished** | A session completes | Title = session name; body = `Session finished`, with the turn duration appended when it is a single notification (e.g. `Session finished · turn took 3s`) |
+| **Finished** | A session completes | Title = session name; body = `Session finished`, with the turn duration appended when it is a single notification (e.g. `Session finished · turn took 2m13s`) |
 | **Pending** | A new pending interaction appears | Title = session name; body = the interaction type: `Approval needed · <tool>` / `Choose an option` (`Choose options` for multi-select, `Type an answer` when there are no options, `N questions` for a batch) / `Plan review`; unknown types fall back to `Something awaits you` |
 
 | Finished (green) | Pending (amber) |
@@ -95,7 +95,17 @@ Other behaviour:
 - **Optional persistence**: turn off **Auto hide** and the notification stays on screen until you dismiss it
 - The notification icon follows your configured status-light colours
 
-### 3. Desktop adaptation
+### 3. Multi-tab coordination
+
+The same DSH page is often open in several tabs, and the plugin coordinates them (Harness itself has no cross-tab mechanism):
+
+- **Only one tab raises notifications and plays sounds** (a deterministic leader is picked by tab id), so one completion never notifies twice
+- **"Foreground" is aggregated across tabs**: while tab B is being watched, a hidden tab A does not think nobody is looking and interrupt you
+- **The unread set is shared across tabs**: opening a session in any tab clears the green light everywhere
+
+Without `BroadcastChannel` the plugin falls back to single-tab behaviour and never throws.
+
+### 4. Desktop adaptation
 
 The desktop app has **no tabs**, so the whale status light means nothing there; the plugin detects the shell and switches shape:
 
@@ -111,7 +121,7 @@ The desktop app has **no tabs**, so the whale status light means nothing there; 
   There is deliberately **no "open system settings" button**: the Electron shell's `setWindowOpenHandler` calls `shell.openExternal` only for `http(s)` and denies every other scheme without a fallback, so `window.open(<system-settings deep link>)` is dropped silently; the preload's `dshDesktop` exposes no "open external URL" either. A button that does nothing is worse than no button, so the panel only carries text guidance (System Settings → Notifications → DeepSeek Harness).
 - Title, body, aggregation, sound, and click-to-open behave **exactly** as in the browser: one code path, not two.
 
-### 4. Sounds
+### 5. Sounds
 
 Finished and pending each have their own dropdown, **47 entries** in total: 2 built-in synthesised chimes plus 45 mp3s taken from opencode's bundled sound library.
 
@@ -132,64 +142,54 @@ Finished and pending each have their own dropdown, **47 entries** in total: 2 bu
 
 ## Installation
 
+> The plugin is **installed from a GitHub repository URL only**. The npm package page, tarballs and local links are no longer distribution channels and are not documented here.
+
 ### Requirements
 
-- **Official DeepSeek Harness**: the current code requires **`0.2.0-rc.2+`** (`engines.dsh` = `>=0.2.0-rc.2 <0.3.0-0`, verified line by line on **0.2.0-rc.2** — 0.2.0-rc.1 and 0.1.x are no longer supported); the published `1.4.x` on npm requires `0.1.7-rc.2+`, and `1.3.x` supports `0.1.2-rc.1+`
-  - The range is declared in `engines.dsh` and the `@deepseek-ai/dsh-*` peers, guarded by `test/compat-range.smoke.mjs`. Both layers split by host version: **the Market never offers an incompatible version to an older host, and the DSH core refuses to load it** — older hosts simply stay on their old release with no update prompt.
+- **DeepSeek Harness `0.2.0-rc.2` or newer 0.2.x** (`engines.dsh` = `>=0.2.0-rc.2 <0.3.0-0`, verified line by line on 0.2.0-rc.2; 0.2.0-rc.1 and 0.1.x are no longer supported)
+  - The range is declared in both `engines.dsh` and the `@deepseek-ai/dsh-*` peers, guarded by `test/compat-range.smoke.mjs`: **the DSH core refuses to load the plugin on an incompatible host**, so an old host never runs it and then breaks.
   - The version gate only compares version strings and cannot detect a removed API (0.1.7 dropped `settings.register` while the old declaration still passed), so never treat it as a compatibility guarantee on its own.
-- System notifications need a **secure context** — `http://127.0.0.1:3080` or `localhost` works; over a **LAN IP** the browser's Notification API is unavailable (a browser restriction, not a plugin issue)
+- **git** on your machine (`dsh plugin add github:…` fetches over git)
+- System notifications need a **secure context** — `http://127.0.0.1:3080` or `localhost` works; over a **LAN IP** the browser's Notification API is unavailable (a browser restriction, not a plugin issue). **The desktop app is exempt** (`dsh-app://app` is a secure context and the shell grants the permission)
 
-### Option 1: from npm (recommended)
-
-Browser UI:
-
-```sh
-dsh plugin --profile web add dsh-notice-center
-```
-
-Desktop app:
+### Web (browser UI)
 
 ```sh
-dsh plugin --profile desktop add dsh-notice-center
+dsh plugin --profile web add github:New2Niu/dsh-notice-center
 ```
 
-> The two profiles are **separate install locations**: installing for the browser UI does not add it to the desktop app, and vice versa. Install twice (settings are stored per profile) if you want both.
+If a proxy interferes with HTTPS, go over SSH instead:
+
+```sh
+dsh plugin --profile web add git+ssh://git@github.com/New2Niu/dsh-notice-center.git
+```
+
+### Desktop app
+
+```sh
+dsh plugin --profile desktop add github:New2Niu/dsh-notice-center
+```
+
 > Quit the desktop app **completely** before running the desktop command — the `desktop` profile is owned by the running app, which asks you to quit first.
 
-Package page: <https://www.npmjs.com/package/dsh-notice-center> (`latest` is stable; prereleases go to the `next` tag — install with `dsh-notice-center@next`)
+The two profiles are **separate install locations**: installing for the browser UI does not add it to the desktop app, and vice versa. Install twice (settings are stored per profile) if you want both.
 
-### Option 2: straight from GitHub
+### Updating
 
-```sh
-dsh plugin --profile web add github:SCP-QQ/dsh-notice-center
-# or over SSH (when a proxy interferes with HTTPS on your machine)
-dsh plugin --profile web add git+ssh://git@github.com:SCP-QQ/dsh-notice-center.git
-```
-
-Swap `--profile web` for `--profile desktop` to install into the desktop app (same for the options below).
-
-### Option 3: from a tarball (offline / internal distribution)
+Run the same `add` command again to pull the latest commit:
 
 ```sh
-npm pack                                        # produces dsh-notice-center-<version>.tgz
-dsh plugin --profile web add ./dsh-notice-center-<version>.tgz
+dsh plugin --profile web add github:New2Niu/dsh-notice-center
+# same for the desktop app: dsh plugin --profile desktop add github:New2Niu/dsh-notice-center
 ```
 
-For the desktop app, a local link is the most convenient while editing:
+To **pin** a release instead of tracking `main`, append the tag:
 
 ```sh
-# in ~/.dsh/profiles/desktop/package.json
-#   dependencies:        "dsh-notice-center": "link:/Users/you/Documents/project/dsh-notice-center"
-#   dsh.profile.bundles: add "dsh-notice-center"
-cd ~/.dsh/profiles/desktop && pnpm install
+dsh plugin --profile web add github:New2Niu/dsh-notice-center#v1.5.0
 ```
 
-### Option 4: local link (while editing the code)
-
-In the profile's `package.json`: add `"dsh-notice-center": "link:<project dir>"` to `dependencies` and `"dsh-notice-center"` to `dsh.profile.bundles`, then run `pnpm install` inside the profile directory.
-
-> **All four options require a Harness / desktop restart to take effect.**
-> Installing from npm / GitHub needs no extra `@deepseek-ai/*` packages from the profile — the host half's only runtime dependency is `@deepseek-ai/schemastery` (available on npm).
+A **Harness / desktop restart** is required for the update to take effect.
 
 ### Uninstall
 
@@ -216,11 +216,13 @@ Remove the dependency and the `dsh.profile.bundles` entry, then restart — noth
    |---|---|---|
    | **Not granted** (you dismissed the prompt) | "Not granted - Grant", clickable | Click it and the browser asks again |
    | **Blocked** | warning icon + "Blocked" | Browsers do **not** ask twice (and a page may not open site settings): hover for the recovery path — click the icon at the left of the address bar → Notifications → Allow, or open `chrome://settings/content/notifications` |
-   | **Unsupported** | one small line | Usually a **secure context** problem (see *Install → Requirements*): use `http://127.0.0.1:3080` |
+   | **Unsupported** | one small line | Usually a **secure context** problem (see *Installation → Requirements*): use `http://127.0.0.1:3080` |
    | Granted | hidden (the row stays clean) | — |
 
    The switch itself always works (you can turn notifications off even while unauthorised — and turning it off stops the automatic request); change the permission in site settings and the chip follows immediately.
-3. **Tune as you like** — expand the two groups: change colours, pick sounds, set volume, toggle **Notify in the foreground** / **Auto hide**
+
+   > **The desktop app is different**: no permission prompt, no address bar, the shell grants the permission. So step 2 there is "open the settings → hit **Send a test notification**": if it appears, the path works; if not, open **System Settings → Notifications → DeepSeek Harness** and allow notifications (the plugin **cannot** open that panel for you — the shell forbids it, see "Desktop adaptation").
+3. **Tune as you like** — expand the two groups: change colours, pick sounds, set volume, toggle **Notify in the foreground** / **Auto hide** (the desktop app only has the **System notifications** group; the colour group is replaced by the desktop note)
 
 <img src="docs/images/settings-en.png" width="440" alt="Notification center settings page">
 
@@ -243,22 +245,23 @@ After that, whenever you switch away or minimise, a finished session or a pendin
 | | Pending sound | `notifyPendingSound` | `builtin-down` | one of 47 |
 
 Settings are persisted by Harness' settings service into the `notice-center:` section of `<DSH_HOME>/settings.yaml`.
-The settings page also shows a one-line footer at the very top with the plugin name and version (e.g. "Notification center v1.3.0") — clicking it opens the repository in a new tab.
+The settings page also shows a one-line footer at the very top with the plugin name and version (e.g. "Notification center v1.5.0") — clicking it opens the repository in a new tab.
 
 ## Troubleshooting
 
 | Symptom | Cause and fix |
 |---|---|
-| No "Notification center" entry in Settings | The plugin did not load. Make sure you **restarted Harness** after installing, then look for `settings namespace "notice-center" registered` in the Harness console |
+| No "Notification center" entry in Settings | The plugin did not load. Make sure you **restarted Harness** after installing, then look for `settings entry "notice-center"` in the Harness console |
 | A switch does nothing / a new setting has no effect | After changing the **host half** (`lib/index.mjs`) you must restart Harness — settings writes go through the host schema |
 | A permission prompt popped up on my very first click after installing | The master switch is on by default, so the plugin borrows your **first interaction** (click / key press) to ask once — browsers refuse permission requests without a user gesture. Choose *Block* if you do not want it, and use the status chip in the settings later |
 | No notifications at all | Three conditions are required: ① the master switch is on; ② browser permission is *Allow*; ③ the page is not in the foreground when the event fires (use **Notify in the foreground** to relax this) |
 | No notifications over a LAN IP | Non-secure context: the browser disables the Notification API, so system notifications are **entirely unavailable** (unrelated to *Notify in the foreground*). Use `127.0.0.1` / `localhost`; over a LAN only the tab status light works |
 | Nothing after closing the tab | Known limitation, see below |
-| The green light disappears after a refresh | Expected. That state is the official signal's in-memory state and is lost on refresh |
+| The green light is still there after a refresh | Expected: unread marks are persisted (7-day expiry, at most 50); opening the session clears it |
 | The notification flashes by too fast | Turn **Auto hide** off and it stays until dismissed |
 | No sound | Check in order: sound switch, volume not 0, whether the sound route is available (it falls back to the built-in chime, so it should never be fully silent) |
 | Notifications swallowed by the OS | Windows Focus Assist / Do Not Disturb intercepts them; the plugin cannot detect it |
+| Several tabs open, only one notification | Expected: a single tab is responsible for notifications and sounds, to avoid duplicates |
 | **Desktop**: no whale status-light group | Deliberate: an app window has no tab icon. The "How the desktop app notifies you" note takes its place |
 | **Desktop**: no notifications at all | The plugin-side conditions match the browser (switch on + not in the foreground), but the permission belongs to the **system**: hit **Send a test notification** in the settings. If nothing appears, open System Settings → Notifications → DeepSeek Harness and allow notifications (macOS asks once on first use; picking *Don't Allow* means changing it by hand) |
 | **Desktop**: how do I open the system notification settings quickly? | The plugin has no such button (the shell forbids plugins from invoking system settings — see "Desktop adaptation"). Manually: macOS System Settings → Notifications → DeepSeek Harness. From a terminal you can also run `open "x-apple.systempreferences:com.apple.Notifications-Settings.extension"` |
@@ -267,7 +270,7 @@ The settings page also shows a one-line footer at the very top with the plugin n
 
 - **No notifications once the browser tab is closed** — Web Push needs a server plus HTTPS, which is not realistic for a local plugin
 - **The Notification API is unavailable in a non-secure context** (LAN IP)
-- **The green state is lost on refresh** — it lives in memory only, which is the behaviour of the official signal itself
+- **Unread marks expire** — entries older than 7 days, or beyond the newest 50, are dropped and their green light goes with them
 - **System-level Do Not Disturb swallows notifications** (Windows Focus Assist etc.); the plugin cannot detect it
 - **The auto-hide duration is not configurable** — the Web Notification spec has no duration parameter; the desktop decides (roughly 5–20 seconds)
 - **The notification card cannot be styled** — the card is rendered by the browser with no CSS or theming hook; only title, body and icon are yours
@@ -287,7 +290,7 @@ The plugin has **two halves** running in different processes, exchanging configu
 | Part | File | Runs in | Responsibility |
 |---|---|---|---|
 | **Host half** | `lib/index.mjs` | Harness main process (Node) | ① Declare the `Config` schema (settings form, write validation and the legacy `settings.yaml` import all derive from it); ② serve `/notice-center-sounds/<id>.mp3` |
-| **Browser half** | `lib/client.cjs` | Browser (plugin bundle) | favicon state machine + notification state machine + sound library + settings page |
+| **Browser half** | `lib/client.cjs` | Browser (plugin bundle) | favicon state machine + notification state machine + cross-tab coordination + sound library + settings page |
 | **Bundle patch** | `cordis.patch.yml` | Loader layer | Insert one row `id: notice-center` into the plugin tree (that id IS the settings namespace) |
 
 **The host half's two optional channels**:
@@ -301,9 +304,9 @@ The plugin has **two halves** running in different processes, exchanging configu
 - **Every field must be `.volatile()`**: `volatileForm()` only projects fields under the nearest volatile ancestor, so one unmarked field disappears from the settings page entirely (`test/host-half.smoke.mjs` asserts this field by field). `.volatile()` requires **schemastery ≥ 3.18.4**.
 - Existing users need no manual migration: at startup dsh-settings reads `<DSH_HOME>/settings.yaml`, writes each section into the entry carrying the **same id**, then renames the file to `settings.yaml.imported`. Our section name equals the entry id (`notice-center`).
 
-**Why the host half does not import `@deepseek-ai/dsh-settings`**: it keeps the host half's only runtime dependency at `@deepseek-ai/schemastery` — and because profiles default to `autoInstallPeers: false`, resolving any `@deepseek-ai` peer would actually fail on a version mismatch and break loading. This is what makes a clean registry install possible.
+**Why the host half does not import `@deepseek-ai/dsh-settings`**: it keeps the host half's only runtime dependency at `@deepseek-ai/schemastery` — and because profiles default to `autoInstallPeers: false`, resolving any `@deepseek-ai` peer would actually fail on a version mismatch and break loading. This is what makes a clean install work.
 
-**Where the browser half gets its data** (all official client services; the plugin holds no state of its own):
+**Where the browser half gets its data** (all official client services; the plugin holds no business state of its own):
 
 | Service | Provided by | Used for |
 |---|---|---|
@@ -313,6 +316,10 @@ The plugin has **two halves** running in different processes, exchanging configu
 | `uiSession` | `@deepseek-ai/dsh-client-ui-session` | `sessionStatus`: `Map<sessionId, { running, pendingInteraction, completionUnread }>` — 0.1.7 removed both the row fields `completed` / `pendingInteraction` and the `pendingInteractions` store; the official workspace session rows use the same mapping (`completed` ≡ `completionUnread`) |
 
 The sound route is deliberately narrow: only `^[a-z0-9-]+\.mp3$` filenames are served (no path traversal), and because the audio is a package constant it is cached `immutable`.
+
+**Cross-tab coordination** (`createCrossTab`): one `BroadcastChannel` (named `dsh-notice-center`) carries heartbeats and full state replication; the live tab with the **smallest tab id is the leader** (a pure comparison — no election races, deterministic handover). Only the leader raises notifications, plays sounds and writes to disk; the unread set and the aggregated foreground state are broadcast so every tab repaints its own favicon (favicons are per-tab DOM). Without `BroadcastChannel` the plugin degrades to single-tab behaviour.
+
+The unread set is persisted through the official `createSnapshotStore` + `persist: { name: "dsh-notice-center:v1:unread" }` (localStorage), with a 7-day TTL and a cap of 50. **Two live instances sharing one persist key would corrupt each other**, hence leader-only writes.
 
 **Desktop platform detection** (`isDesktopClient` in `lib/client.cjs`): the shell preload exposes the full product API (`deviceInfo` / `browser` / `keyboard` / `shortcuts` / `updates`) only on the `dsh-app://app` main frame; an embedded iframe only gets `{ protocolVersion: 1 }`. The check therefore requires **both** `protocolVersion === 1` and a `deviceInfo` function — the same signal the official packages use (`"dshDesktop" in globalThis` in `dsh-client-shortcuts`, `dsh-client-ui-chat`, `dsh-client-product-analytics`, …).
 
@@ -328,7 +335,7 @@ Three hard shell constraints shape the branches:
 package.json                    package metadata (scripts: test / test:host / test:client / test:desktop / test:compat)
 cordis.patch.yml                bundle patch layer (insert id: notice-center)
 lib/index.mjs                   host half: settings schema + sound static route
-lib/client.cjs                  browser half / desktop renderer: state machines + notifications + sound library + settings page
+lib/client.cjs                  browser half / desktop renderer: state machines + notifications + cross-tab + sound library + settings page
 assets/audio/*.mp3              45 opencode sounds (MIT; see assets/audio/README.md)
 docs/images/                    README screenshots, banners and the social-preview card
 test/host-half.smoke.mjs        host-half smoke test
@@ -336,7 +343,6 @@ test/client-half.smoke.mjs      browser-half smoke test: state machine + real se
 test/desktop-half.smoke.mjs     desktop-branch smoke test: detection / no status light / test notification / permission chip
 test/compat-range.smoke.mjs     compatibility range (engines.dsh / peers / files list)
 .github/workflows/test.yml      CI: runs pnpm test on push / PR
-.github/workflows/publish.yml   release: tag-triggered, OIDC, no token
 ```
 
 ## Life of a notification
@@ -345,7 +351,7 @@ test/compat-range.smoke.mjs     compatibility range (engines.dsh / peers / files
 sessions.list changes
    └─ sync()
         ├─ trackEdges()        running true->false edge (compensation when the current session finishes)
-        ├─ detectTransitions() official completed false->true; new sessions in pendingInteractions
+        ├─ detectTransitions() official completed false->true; new sessions with a pending interaction
         │     └─ queueNotification(kind, sessionId, label, typeLabel)
         │          ├─ master switch off            -> dropped
         │          ├─ this same completion already queued -> dropped (no double-send)
@@ -354,6 +360,7 @@ sessions.list changes
 
 300ms later, flushNotifications()
    ├─ permission not granted                     -> dropped
+   ├─ not the leader tab                         -> dropped (single writer for side effects)
    ├─ page in foreground and foreground notify off -> dropped
    ├─ group by kind -> one Notification per group (title = session name, body = event type)
    └─ play the selected sound
@@ -365,7 +372,7 @@ Notifications deliberately carry **no `tag`**: the same session reuses the same 
 
 ```sh
 pnpm install          # the only runtime dependency is @deepseek-ai/schemastery
-npm test              # all four smoke tests
+npm test              # host half + browser half + desktop branch + compatibility range
 ```
 
 **The restart rule has two halves — this is the easiest thing to trip over:**
@@ -392,7 +399,7 @@ npm run test:compat   # compatibility range only
 All four smoke tests are **zero-dependency, pure Node** — no browser needed:
 
 - **Host half**: actually executes `apply()`, asserts only the expected services are injected, checks schema defaults and validation, exercises the sound route (serves an mp3 / 404 for unknown / rejects path traversal / all 45 packaged files present) and verifies that an existing `settings.yaml` passes the schema **with every field preserved verbatim**
-- **Browser half**: stubs `window.__ModuleLoader__` / `document` / `Notification`, evaluates the bundle and takes its factory, assembles `apply()` with a fake `ctx`, then drives state transitions and asserts the `Notification` constructor arguments. The settings page is **really rendered** against a recording stub (React element tree), asserting switch order, that each control writes only its own field, collapse behaviour, the footer, and more
+- **Browser half**: stubs `window.__ModuleLoader__` / `document` / `Notification` / `BroadcastChannel`, evaluates the bundle and takes its factory, assembles `apply()` with a fake `ctx`, then drives state transitions and asserts the `Notification` constructor arguments. The settings page is **really rendered** against a recording stub (React element tree), asserting switch order, that each control writes only its own field, collapse behaviour, the footer, and more
 - **Desktop**: loads the same bundle with `globalThis.dshDesktop` set instead, asserting what counts as desktop (a plain browser, an iframe carrying only `protocolVersion`, and a mismatched protocol version all **do not**), that the status-light group is **not** rendered, that the test-notification button really raises a notification, that the permission chip is a pointer rather than a grant button, and that no first-gesture permission request is armed
 
 Invariants pinned by the tests — do not break these:
@@ -401,67 +408,47 @@ Invariants pinned by the tests — do not break these:
 - The `SOUND_PACKS` library must map **one-to-one** onto the files in `assets/audio/`; adding a sound means updating it in **two places**: `lib/client.cjs` and `test/client-half.smoke.mjs`
 - The `zh` and `en` dictionaries must have identical key sets (asserted by both `test/client-half.smoke.mjs` and `test/desktop-half.smoke.mjs`)
 - Desktop detection may only accept "`protocolVersion === 1` **and** a `deviceInfo` function": drop either half and the shell's embedded iframes count as the desktop main frame
-- Anything in the settings page that must reach **outside `apply`'s scope** (the icon, colour lookup, test notification, opening system settings) has to be a module-level function with the caller injecting its parameters — the component is not inside `apply`'s closure, and referencing an `apply`-local function there crashes the whole page with a `ReferenceError` (hit once while building 1.5.0)
+- Anything in the settings page that must reach **outside `apply`'s scope** (the icon, colour lookup, test notification) has to be a module-level function with the caller injecting its parameters — the component is not inside `apply`'s closure, and referencing an `apply`-local function there crashes the whole page with a `ReferenceError` (hit once while building 1.5.0)
 
-## Releasing
+## Releasing and distribution
 
-Releasing is driven by a **tag-triggered** [`publish.yml`](.github/workflows/publish.yml) — ordinary commits and pushes **never publish**:
+This repository **distributes through the GitHub repository URL only**; it does not publish to npm. A release is three steps:
 
-| Intent | Command | Result |
-|---|---|---|
-| Commit only (feature not validated yet) | `git commit` + `git push` | Only `test.yml` runs; npm sees nothing |
-| Prerelease (for testers) | set version to `1.3.0-rc.1` → commit → `git tag v1.3.0-rc.1 && git push origin v1.3.0-rc.1` | Published to the **`next`** tag; `latest` untouched |
-| Stable release | set version to `1.3.0` → commit → `git tag v1.3.0 && git push origin v1.3.0` | Published to **`latest`**, with provenance attached |
-| Validate the pipeline only | Actions → publish → Run workflow | Installs, tests and runs `npm pack --dry-run` — **publishes nothing** |
+1. **Bump the version** — `version` in `package.json` and `PLUGIN_VERSION` in `lib/client.cjs` (the host-half smoke test checks they agree)
+2. **Write the notes** — add this release to the top of [`CHANGELOG.md`](./CHANGELOG.md) (user-visible changes plus compatibility notes)
+3. **Tag and push** —
 
-The workflow has **three gates**; failing any one blocks the release:
+```sh
+git tag v1.5.0
+git push origin v1.5.0
+```
 
-1. The tag must match the `package.json` version
-2. The tagged commit must already be on `main`
-3. Tests must pass
+After pushing:
 
-The publish step is also **idempotent**: if that version already exists on the registry it is skipped, so re-tagging or re-running never fails the build.
+- `test.yml` runs the tests on `main`
+- Users who want a fixed version can install `github:New2Niu/dsh-notice-center#v1.5.0`
+- For a readable release note on GitHub, create a Release from that tag and paste the matching CHANGELOG section
 
-Before tagging, add this release to [`CHANGELOG.md`](./CHANGELOG.md) (user-visible changes plus compatibility notes) — it is the source of the release notes shown on the npm page and the GitHub Release.
-
-### One-time setup: npm Trusted Publishing (OIDC)
-
-Publishing needs no npm token at all (so there is nothing to expire or leak). Open the package page → **Publishing Access** → *Trusted publishers* → **Add a trusted publisher** → choose **GitHub Actions**:
-
-<https://www.npmjs.com/package/dsh-notice-center/access>
-
-| Field | Value |
-|---|---|
-| Organization or user | `SCP-QQ` |
-| Repository | `dsh-notice-center` |
-| Workflow filename | `publish.yml` (**filename only**, no path; renaming the file requires updating this or publishing returns 403) |
-| Environment name | `npm` (must match the workflow's `environment:`) |
-| **Allowed actions → Allow npm publish** | ✅ **required** |
-
-> ⚠️ That checkbox is new npm behaviour: a trusted publisher may **only `npm stage publish`** by default, so without *Allow npm publish* the workflow's `npm publish` is rejected.
-> If you would rather have "staged only, human approves in the browser", leave it unchecked and change the last step to `npm stage publish`.
-
-- With OIDC, npm attaches **provenance automatically** (no `--provenance` flag); the package page shows the attestation
-- To require a manual approval after pushing a tag: repository Settings → Environments → `npm` → add **Required reviewers** (optional)
-- Publishing from your own machine is still possible with a granular token: put `//registry.npmjs.org/:_authToken=<token>` in an `.npmrc` at the project root. That file is already in `.gitignore` — **never commit it**
+> `.github/workflows/publish.yml` is the **upstream npm package** pipeline (OIDC Trusted Publishing) with a repository guard — tagging in this repository does not trigger it, and day-to-day work never touches it.
 
 ## Design constraints
 
 Read these before changing code — each one came from a real bug:
 
 1. **No `tag` on notifications** — the same tag is treated as an *update* and silently replaces (see "Life of a notification")
-2. **"Foreground" is `tab visible && window focused`** — using `visibilityState` alone misreads "browser buried behind another app" as "the user is looking", which is exactly when a notification matters most
+2. **"Foreground" is `tab visible && window focused`**, **aggregated across all tabs** — using `visibilityState` alone misreads "browser buried behind another app" as "the user is looking", which is exactly when a notification matters most
 3. **Amber beats green** — matching the official `sessionStatuses`; a pending interaction is the primary status
 4. **The turn duration comes from observing the `running` edge** — a session already running when the page loads has no known start, so no duration is shown (never guessed)
-5. **The host half keeps zero `@deepseek-ai` runtime dependencies** — only `schemastery`, otherwise a registry install breaks on peer resolution
-6. **The sound route only allows `^[a-z0-9-]+\.mp3$`** — the filename goes straight into a path join, so it must be whitelisted
-7. **Desktop trust is main-frame only** — desktop means `protocolVersion === 1` **and** a `deviceInfo` function; the bare `{ protocolVersion: 1 }` an embedded iframe sees must not count, or child frames take the desktop branch too
-8. **The settings component shares no closure with `apply`** — anything crossing that boundary (icon, colour lookup, test notification) is a module-level function with caller-injected parameters; referencing an `apply`-local function crashes the whole page
-9. **No status light on desktop** — with no tab icon, do not bolt on a substitute (the shell offers no dock/tray badge and the plugin cannot patch the main process); system notifications are the desktop signal
+5. **Side effects run only in the leader tab** — otherwise, with two background tabs, one completion notifies twice and rings twice
+6. **The host half keeps zero `@deepseek-ai` runtime dependencies** — only `schemastery`, otherwise loading breaks on peer resolution
+7. **The sound route only allows `^[a-z0-9-]+\.mp3$`** — the filename goes straight into a path join, so it must be whitelisted
+8. **Desktop trust is main-frame only** — desktop means `protocolVersion === 1` **and** a `deviceInfo` function; the bare `{ protocolVersion: 1 }` an embedded iframe sees must not count, or child frames take the desktop branch too
+9. **The settings component shares no closure with `apply`** — anything crossing that boundary (icon, colour lookup, test notification) is a module-level function with caller-injected parameters; referencing an `apply`-local function crashes the whole page
+10. **No status light on desktop** — with no tab icon, do not bolt on a substitute (the shell offers no dock/tray badge and the plugin cannot patch the main process); system notifications are the desktop signal
 
 ## Feedback and contributing
 
-- Issues and ideas: <https://github.com/SCP-QQ/dsh-notice-center/issues>
+- Issues and ideas: <https://github.com/New2Niu/dsh-notice-center/issues>
 - Run `npm test` before proposing a change; settings-related changes should update the assertions in `test/*.smoke.mjs`
 - Sound assets come from [anomalyco/opencode](https://github.com/anomalyco/opencode) (MIT) — keep [`assets/audio/README.md`](./assets/audio/README.md) in sync when replacing or removing them
 

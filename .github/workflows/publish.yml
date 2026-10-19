@@ -12,6 +12,10 @@ name: publish
 #   Repository           : dsh-notice-center
 #   Workflow filename    : publish.yml   ← 重命名本文件必须同步改这里，否则发布 403
 #   Environment          : npm           ← 想要「人工批准才发布」就填它，再去仓库里加 Required reviewers
+#
+# ⚠️ 本仓库（New2Niu/dsh-notice-center）**不通过 npm 分发**，只从仓库地址安装。
+# 这条流水线属于上游 npm 包，下面的 job 级 if 把它锁在 SCP-QQ 仓库上：
+# 在本仓库打 tag 不会触发发布，也不会因为缺少 Trusted Publishing 配置而报 403。
 
 on:
   push:
@@ -27,6 +31,8 @@ concurrency:
 
 jobs:
   publish:
+    # 只有上游 npm 包的仓库才发布；本仓库（New2Niu）只从仓库地址安装，直接跳过。
+    if: github.repository == 'SCP-QQ/dsh-notice-center'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:
