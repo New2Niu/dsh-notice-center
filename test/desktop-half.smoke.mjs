@@ -120,7 +120,7 @@ const jsx = (type, props) => {
   jsxNodes.push(node);
   return node;
 };
-/** primitives：只要名字对得上就返回标记组件（名字都取自官方 0.2.0-rc.2 的真实导出）。 */
+/** primitives：只要名字对得上就返回标记组件（名字都取自官方 0.2.1-rc.2 的真实导出）。 */
 const primitivesStub = new Proxy({}, {
   get: (_target, name) => {
     const marker = (props) => ({ primitive: String(name), props: props ?? {} });

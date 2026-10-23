@@ -14,7 +14,7 @@
 | 插件实例 id | `notice-center` |
 | 设置命名空间 | `notice-center` |
 | 安装方式 | **只支持仓库地址安装**（见[安装](#安装)） |
-| 宿主要求 | DeepSeek Harness `0.2.0-rc.2` – `0.3.0` |
+| 宿主要求 | DeepSeek Harness `0.2.1-rc.2` – `0.3.0` |
 
 ## 目录
 
@@ -145,7 +145,7 @@
 
 ### 前置要求
 
-- **DeepSeek Harness `0.2.0-rc.2` 或更新的 0.2.x**（`engines.dsh` = `>=0.2.0-rc.2 <0.3.0-0`，已在 0.2.0-rc.2 上逐条验证；0.2.0-rc.1 与 0.1.x 不再兼容）
+- **DeepSeek Harness `0.2.1-rc.2` 或更新的 0.2.x**（`engines.dsh` = `>=0.2.1-rc.2 <0.3.0-0`，已在 0.2.1-rc.2 上逐条验证；0.2.1-rc.1、0.2.0.x 与 0.1.x 不再兼容）
   - 兼容范围同时写在 `engines.dsh` 与 `@deepseek-ai/dsh-*` peer 上，由 `test/compat-range.smoke.mjs` 守护：**DSH 核心在加载前会拒绝不兼容的宿主**，旧宿主不会把插件跑起来再崩。
   - 版本闸门只比版本号，查不出 API 被删（0.1.7 删掉了 `settings.register`，旧声明在那上面照样 PASS），所以别只靠它当兼容性保障。
 - 本机有 **git**（`dsh plugin add github:…` 会走 git 拉取）
@@ -298,7 +298,7 @@ dsh plugin --profile web remove dsh-notice-center
 - `ctx.inject(["settings"], …)` —— 声明「本插件自带设置页」：`settings.configure({ auto: false }, ctx.fiber)`。owner 必须是插件自身的 fiber（`describe()` 按 `entry.fiber` 查这份策略，而 `inject` 子 fiber 是另一个 fiber）
 - `ctx.inject(["webServer"], …)` —— 挂载音效路由。服务缺席时不挂载，浏览器半自动回退到内置合成音
 
-**设置契约（0.1.7 起，0.2.0-rc.1 / 0.2.0-rc.2 上逐条复核仍成立，这是本插件最容易静默踩坏的地方）**：
+**设置契约（0.1.7 起，0.2.0-rc.1 / 0.2.0-rc.2 / 0.2.1-rc.2 上逐条复核仍成立，这是本插件最容易静默踩坏的地方）**：
 
 - 表单由**插件自己的 Config** 派生：dsh-settings 的 `describe()` 读入口 fiber 的 `runtime.Config`，条目 id 就是命名空间 —— 插件**不再注册命名空间**（旧的 `settings.register(ns, schema)` 在 0.1.7 已删除）。
 - **每个字段都要 `.volatile()`**：`volatileForm()` 只投影「最近的可变祖先」下的字段，漏标一个就等于那个设置项在设置页里整条消失（`test/host-half.smoke.mjs` 为此逐字段断言）。`.volatile()` 需要 **schemastery ≥ 3.18.4**。
@@ -336,6 +336,7 @@ package.json                    包元数据（scripts: test / test:host / test:
 cordis.patch.yml                bundle patch 层（insert id: notice-center）
 lib/index.mjs                   宿主半：settings schema + 音效静态路由
 lib/client.cjs                  浏览器半 / 桌面端渲染进程：状态机 + 通知 + 跨标签页 + 音效库 + 设置页
+locale/*.json                   官方插件页显示元数据：meta.title / meta.description（zh / en）
 assets/audio/*.mp3              45 个 opencode 音效（MIT，来源见 assets/audio/README.md）
 docs/images/                    README 截图、主图与社交预览图
 test/host-half.smoke.mjs        宿主半冒烟

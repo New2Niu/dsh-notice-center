@@ -282,7 +282,7 @@ const primitivesExports = new Set([
   "Tooltip",
   "IconChevronDownOutlineRegular",
   "IconRefreshOutlineRegular",
-  /* 桌面端说明行用的信息图标（0.2.0-rc.2 实测导出存在：IconInfoOutlineRegular）。 */
+  /* 桌面端说明行用的信息图标（0.2.0-rc.2 实测导出存在，0.2.1-rc.2 复核仍在：IconInfoOutlineRegular）。 */
   "IconInfoOutlineRegular",
   "IconQuestionOutlineRegular",
   "IconWarningOutlineRegular"
@@ -1464,7 +1464,7 @@ check("24c 本次会话已经问过 → 再交互不重复弹窗", FakeNotificat
 check("24d 全程不落盘任何「已问过」标记（没做选择就等于还能再问）", fakeStorage.get("dsh-notice-center:v1:permission-asked") === void 0, JSON.stringify(fakeStorage.get("dsh-notice-center:v1:permission-asked")));
 
 /* ==================== 25. 点通知跳到对应会话 ==================== */
-/* 0.2.0-rc.1 实测、0.2.0-rc.2 复核仍成立：跳转能力在 `uiWorkspace.openSession(target)` 上，宿主从来没有
+/* 0.2.0-rc.1 实测、0.2.0-rc.2 与 0.2.1-rc.2 复核仍成立：跳转能力在 `uiWorkspace.openSession(target)` 上，宿主从来没有
    `sessions.open` —— 旧代码那句调用一直被 try/catch 吞掉，点通知只聚焦窗口不跳转。
    这条断言钉住「点击真的调了 openSession，且传的是这条通知对应的 sessionId」。 */
 reset();

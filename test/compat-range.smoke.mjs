@@ -1,5 +1,5 @@
 /**
- * 兼容性声明矩阵测试 —— 守住「本版只发给 0.2.0-rc.2 及以后的宿主」这一条声明。
+ * 兼容性声明矩阵测试 —— 守住「本版只发给 0.2.1-rc.2 及以后的宿主」这一条声明。
  *
  * 为什么需要它：
  * 插件市场（dshmarket）的「检查更新」会读**已发布 manifest** 的 `engines.dsh`
@@ -16,9 +16,12 @@
  * 退出码 0 = 全部通过；1 = 有失败项。
  *
  * 判定规则来源（两份独立实现，本文件只覆盖它们一致的那部分）：
- *   - DSH 核心 `evaluatePluginCompatibility`：只看 `@deepseek-ai/dsh` 与
- *     `@deepseek-ai/dsh-*` 的 peer，用 semver.satisfies(runtime, range,
- *     { includePrerelease: true }) 比对**运行时版本**（`dsh --version`）。
+ *   - DSH 核心 `evaluatePluginCompatibility`（0.2.1-rc.2 复核 `unmetRequirements`）：
+ *     清单里**有 `engines.dsh` 就只看它**，dsh-* peer 一律忽略；没有 engines.dsh
+ *     才逐个检查 `@deepseek-ai/dsh` 与 `@deepseek-ai/dsh-*` 的 peer。用
+ *     semver.satisfies(runtime, range, { includePrerelease: true }) 比对**运行时
+ *     版本**（`dsh --version`）。（0.2.0-rc.2 及以前的核心只看 peer、不看 engines，
+ *     这是 0.2.1 起的变化。）
  *   - 市场 `deriveHostCompatibility`：读 `engines.dsh` 加上 hostPackages 命中的
  *     dsh-* peer，同样按 includePrerelease 比对；全部声明都成立才 compatible，
  *     有一条不成立即 incompatible，无法判定是 unknown（unknown 会被放行）。
@@ -122,8 +125,9 @@ function satisfies(runtime, range) {
 
 /* ------------------------------ 两层的判定逻辑 ------------------------------ */
 
-/** 声明里所有被 DSH 核心检查的范围（不声明 dsh peer ⇒ 不施加约束 ⇒ 恒真）。 */
+/** 声明里所有被 DSH 核心检查的范围（0.2.1 起：有 engines.dsh 就只看它，peer 忽略）。 */
 function coreRanges(value) {
+	if (typeof value.engines?.dsh === "string") return [value.engines.dsh];
 	return Object.entries(value.peerDependencies ?? {})
 		.filter(([name]) => name === "@deepseek-ai/dsh" || name.startsWith("@deepseek-ai/dsh-"))
 		.map(([, range]) => range);
@@ -134,14 +138,24 @@ function dshCoreAccepts(value, runtime) {
 	return ranges.length === 0 ? true : ranges.every((range) => satisfies(runtime, range) === true);
 }
 
+/** 本清单里所有 DSH 相关声明（engines.dsh + dsh-* peer），市场层与结构性断言共用同一份口径。 */
+function declaredRangesOf(value) {
+	const ranges = Object.entries(value.peerDependencies ?? {})
+		.filter(([name]) => name === "@deepseek-ai/dsh" || name.startsWith("@deepseek-ai/dsh-"))
+		.map(([, range]) => range);
+	if (typeof value.engines?.dsh === "string") ranges.push(value.engines.dsh);
+	return ranges;
+}
+
 /**
  * 市场的判定：engines.dsh + dsh-* peer 全部成立 → compatible；
  * 任一条明确不成立 → incompatible；其余（含无法判定）→ unknown。
  * 注意 unknown 会被放行，所以测试对旧宿主断言的是 incompatible，而不是「非 compatible」。
  */
 function marketVerdict(value, runtime) {
-	const declarations = coreRanges(value);
-	if (typeof value.engines?.dsh === "string") declarations.push(value.engines.dsh);
+	/* 市场那层不跟随核心裁剪：engines.dsh 与 dsh-* peer 都要成立（与
+	   declaredRanges 同一份口径，见下方结构性断言）。 */
+	const declarations = declaredRangesOf(value);
 	if (declarations.length === 0) return "unknown";
 	const results = declarations.map((range) => satisfies(runtime, range));
 	if (results.includes(false)) return "incompatible";
@@ -155,8 +169,10 @@ for (const [name, range] of Object.entries(manifest.peerDependencies ?? {})) {
 	if (name === "@deepseek-ai/dsh" || name.startsWith("@deepseek-ai/dsh-")) console.log(`        ${name}@${range}`);
 }
 
-const declaredRanges = coreRanges(manifest);
-if (typeof manifest.engines?.dsh === "string") declaredRanges.push(manifest.engines.dsh);
+/* 结构性断言故意把 engines.dsh 与所有 dsh-* peer **都**收进来：核心 0.2.1 起只看
+   engines，但市场那层两个都看 —— 任何一条写歪（语法不认识 / 两处范围不一致）都会
+   让两层判定各说各话，所以这里不跟随核心做裁剪。 */
+const declaredRanges = declaredRangesOf(manifest);
 
 check("engines.dsh 已声明（否则市场判 unknown 并放行给所有宿主）", typeof manifest.engines?.dsh === "string" && manifest.engines.dsh.trim() !== "", JSON.stringify(manifest.engines?.dsh));
 
@@ -182,13 +198,15 @@ const MATRIX = [
 	["0.1.5-rc.1", false, "最近一次实测过的旧宿主"],
 	["0.1.6", false, "0.1.7 之前的最后一个补丁线"],
 	["0.1.7-rc.1", false, "旧下限之前（未验证，故意排除）"],
-	["0.1.7-rc.2", false, "上一版的下限宿主：本版起不再发给 0.1 线"],
+	["0.1.7-rc.2", false, "0.1 线下限宿主：已不再发给 0.1 线"],
 	["0.1.7", false, "0.1.7 正式版"],
 	["0.1.8-rc.1", false, "0.1.x 后续预发布"],
 	["0.1.9", false, "0.1.x 最后一个补丁线"],
-	["0.2.0-rc.1", false, "上一版的下限宿主：本版起不再发给（API 与 rc.2 相同，纯声明收窄）"],
-	["0.2.0-rc.2", true, "本版下限：本机开发宿主"],
-	["0.2.0", true, "0.2.0 正式版"],
+	["0.2.0-rc.1", false, "0.2 线最早预发布（核心仍只看 peer 的年代）"],
+	["0.2.0-rc.2", false, "上一版的下限宿主：本版起不再发给（API 在 0.2.1-rc.2 上逐条复核仍成立，纯声明收窄）"],
+	["0.2.0", false, "0.2.0 正式版（同上：纯声明收窄）"],
+	["0.2.1-rc.1", false, "0.2.1 线最早预发布（未验证，故意排除）"],
+	["0.2.1-rc.2", true, "本版下限：本机开发宿主（核心改看 engines.dsh 的第一版）"],
 	["0.2.1", true, "0.2.x 后续补丁不该被拒"],
 	["0.3.0-rc.1", false, "上界之外：跨出 0.2 线需重新验证后手动放行"],
 ];
@@ -237,6 +255,35 @@ if (typeof icon === "string" && icon !== "") {
 		const shipped = (manifest.files ?? []).some((entry) => entry === icon || icon.startsWith(`${entry.replace(/\/$/u, "")}/`));
 		check("icon 落在 files 发布范围内（npm 安装的宿主也能看到）", shipped, JSON.stringify(manifest.files));
 	}
+}
+
+/* --------------------- 插件页显示元数据（locale/*.json） ---------------------
+   0.2.1-rc.2 的 readPluginMeta 改成先读 `<包>/locale/<lang>.json` 的 `meta.title` /
+   `meta.description` 当插件页显示名（en.json 是锚：没有它，其余语言文件根本不会被扫），
+   缺的字段才回落到 package.json 的 name / description。这里钉住官方约定的几条：
+   文件形态、meta 字段非空、exports 暴露了子路径（否则宿主解析不到）、files 覆盖
+   （npm 安装的宿主也能看到）。 */
+const PLUGIN_PAGE_LANGUAGES = [
+	["en", "Notice Center"],
+	["zh", "通知中心"],
+];
+const localeExported = manifest.exports?.["./locale/*.json"] === "./locale/*.json";
+check("exports 暴露了 ./locale/*.json 子路径（宿主按此解析插件页语言文件）", localeExported, JSON.stringify(manifest.exports?.["./locale/*.json"]));
+check("locale 目录落在 files 发布范围内", (manifest.files ?? []).some((entry) => entry === "locale" || entry === "locale/" || entry === "locale/*.json"), JSON.stringify(manifest.files));
+for (const [language, title] of PLUGIN_PAGE_LANGUAGES) {
+	const file = resolve(packageRoot, "locale", `${language}.json`);
+	check(`locale/${language}.json 存在`, existsSync(file), file);
+	if (!existsSync(file)) continue;
+	let parsed;
+	try {
+		parsed = JSON.parse(readFileSync(file, "utf8"));
+	} catch (error) {
+		check(`locale/${language}.json 是合法 JSON`, false, String(error));
+		continue;
+	}
+	check(`locale/${language}.json 的 meta.title 非空（官方插件页显示名）`,
+		typeof parsed?.meta?.title === "string" && parsed.meta.title.trim() !== "" && parsed.meta.title === title,
+		JSON.stringify(parsed?.meta?.title));
 }
 
 console.log(failed === 0 ? "\n全部通过" : `\n有 ${failed} 项失败`);

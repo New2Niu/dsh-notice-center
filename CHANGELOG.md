@@ -6,7 +6,22 @@
 约定：版本号见 `package.json`；安装只走仓库地址（`github:New2Niu/dsh-notice-center`），
 需要固定版本时用 `#v<版本>` 形式的 tag。括号里的短哈希是那次改动的提交。
 
-## 未发布 — 文档与分发渠道调整
+## 未发布 — 适配 DSH 0.2.1-rc.2 + 文档与分发渠道调整
+
+### 变更
+
+- **宿主兼容下限升到 DSH `0.2.1-rc.2`**（`engines.dsh` 与各 `@deepseek-ai/dsh-*` peer 同步收窄为 `>=0.2.1-rc.2 <0.3.0-0`）：本机开发宿主已是 0.2.1-rc.2，逐条复核后确认本插件用到的 API（`configForms.get` / `locale.bind` / `uiSession.sessionStatus` / `uiWorkspace.openSession` / `webServer.register` / `settings.configure`）全部原样，纯声明收窄；0.2.0.x 与 0.1.x 宿主不再收到本插件更新
+- `test/compat-range.smoke.mjs` 跟进 0.2.1 起的**核心兼容判定变化**：有 `engines.dsh` 时核心只看它（不再看 dsh-* peer），测试模型与矩阵同步；市场那层仍两个都看，结构性断言不跟随裁剪
+
+### 新增
+
+- 官方插件页按界面语言显示本地化名称/描述：新增 `locale/en.json` + `locale/zh.json`（`meta.title` = `Notice Center` / `通知中心`），替代裸包名 `dsh-notice-center` 与单一语言的 package.json 描述
+
+### 修复
+
+- 设置页注释里「非 loopback = memory 模式」的说法作废：memory 模式已在 0.2.1 整个移除（设置快照不再有 `mode` 字段），代码本就不依赖它，只更新注释避免误导
+
+### 文档
 
 - docs: README 按当前功能重新整理——补上「多标签页协同」「未读状态落盘」，桌面端适配升为独立章节
 - docs: 安装方式收敛为**只支持仓库地址安装**（`github:New2Niu/dsh-notice-center`），移除 npm / tarball / 本地 link 的说明

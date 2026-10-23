@@ -14,7 +14,7 @@
 | Plugin instance id | `notice-center` |
 | Settings namespace | `notice-center` |
 | Install method | **Git repository URL only** (see [Installation](#installation)) |
-| Host requirement | DeepSeek Harness `0.2.0-rc.2` – `0.3.0` |
+| Host requirement | DeepSeek Harness `0.2.1-rc.2` – `0.3.0` |
 
 ## Contents
 
@@ -146,7 +146,7 @@ Finished and pending each have their own dropdown, **47 entries** in total: 2 bu
 
 ### Requirements
 
-- **DeepSeek Harness `0.2.0-rc.2` or newer 0.2.x** (`engines.dsh` = `>=0.2.0-rc.2 <0.3.0-0`, verified line by line on 0.2.0-rc.2; 0.2.0-rc.1 and 0.1.x are no longer supported)
+- **DeepSeek Harness `0.2.1-rc.2` or newer 0.2.x** (`engines.dsh` = `>=0.2.1-rc.2 <0.3.0-0`, verified line by line on 0.2.1-rc.2; 0.2.1-rc.1, 0.2.0.x, and 0.1.x are no longer supported)
   - The range is declared in both `engines.dsh` and the `@deepseek-ai/dsh-*` peers, guarded by `test/compat-range.smoke.mjs`: **the DSH core refuses to load the plugin on an incompatible host**, so an old host never runs it and then breaks.
   - The version gate only compares version strings and cannot detect a removed API (0.1.7 dropped `settings.register` while the old declaration still passed), so never treat it as a compatibility guarantee on its own.
 - **git** on your machine (`dsh plugin add github:…` fetches over git)
@@ -298,7 +298,7 @@ The plugin has **two halves** running in different processes, exchanging configu
 - `ctx.inject(["settings"], …)` — declares "this plugin ships its own page": `settings.configure({ auto: false }, ctx.fiber)`. The owner must be the plugin's own fiber (`describe()` looks the policy up by `entry.fiber`, and the `inject` child is a different fiber)
 - `ctx.inject(["webServer"], …)` — mounts the sound route. When the service is absent the route is not mounted and the browser half falls back to the built-in chime
 
-**The settings contract (since 0.1.7 — re-verified line by line on 0.2.0-rc.1 and 0.2.0-rc.2, and the easiest thing to break silently here)**:
+**The settings contract (since 0.1.7 — re-verified line by line on 0.2.0-rc.1, 0.2.0-rc.2, and 0.2.1-rc.2, and the easiest thing to break silently here)**:
 
 - The form is derived from the **plugin's own Config**: dsh-settings' `describe()` reads the entry fiber's `runtime.Config`, and the entry id is the namespace — the plugin **no longer registers a namespace** (the old `settings.register(ns, schema)` was removed in 0.1.7).
 - **Every field must be `.volatile()`**: `volatileForm()` only projects fields under the nearest volatile ancestor, so one unmarked field disappears from the settings page entirely (`test/host-half.smoke.mjs` asserts this field by field). `.volatile()` requires **schemastery ≥ 3.18.4**.
@@ -336,6 +336,7 @@ package.json                    package metadata (scripts: test / test:host / te
 cordis.patch.yml                bundle patch layer (insert id: notice-center)
 lib/index.mjs                   host half: settings schema + sound static route
 lib/client.cjs                  browser half / desktop renderer: state machines + notifications + cross-tab + sound library + settings page
+locale/*.json                   plugin-page display metadata: meta.title / meta.description (zh / en)
 assets/audio/*.mp3              45 opencode sounds (MIT; see assets/audio/README.md)
 docs/images/                    README screenshots, banners and the social-preview card
 test/host-half.smoke.mjs        host-half smoke test
